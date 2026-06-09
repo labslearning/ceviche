@@ -1,0 +1,310 @@
+{% load static %}
+<!DOCTYPE html>
+<html class="no-js" lang="es-CO">
+<head>
+    <title>Cartelera Oficial | CevicheStudios</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#000000">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
+
+    <link href="http://assets.jumpseller.com/public/themes/influence/bootstrap_3.min.css" rel="stylesheet" type="text/css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <link href="https://assets.jumpseller.com/store/cevichestudios/themes/638214/app.min.css?1758591088" rel="stylesheet" type="text/css">
+    
+    <style>
+        :root {
+            --brand-color: #ff6600;
+            --dark-bg: #111111;
+            --card-bg: #ffffff;
+            --text-main: #2c3e50;
+            --text-muted: #95a5a6;
+        }
+
+        body {
+            font-family: 'Open Sans', sans-serif;
+            background-color: #f4f6f9; /* Gris muy suave para resaltar las tarjetas blancas */
+        }
+
+        h1, h2, h3, h4, .btn {
+            font-family: 'Montserrat', sans-serif;
+        }
+
+        /* --- TARJETA DE EVENTO PRO --- */
+        .event-card {
+            background: var(--card-bg);
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+            transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+            border: 1px solid rgba(0,0,0,0.03);
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .event-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 20px 40px rgba(255, 102, 0, 0.15); /* Sombra naranja sutil */
+        }
+
+        /* Contenedor de Imagen con Efecto Zoom */
+        .event-poster-container {
+            height: 400px; /* Más alto para elegancia */
+            overflow: hidden;
+            position: relative;
+            background-color: #000;
+        }
+
+        .event-poster {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.6s ease;
+            opacity: 0.95;
+        }
+
+        .event-card:hover .event-poster {
+            transform: scale(1.08); /* Zoom lento al pasar el mouse */
+            opacity: 1;
+        }
+
+        /* --- DATE BADGE (La Joya) --- */
+        .date-badge {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(5px);
+            padding: 10px 15px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            z-index: 10;
+        }
+        .date-badge .day {
+            display: block;
+            font-size: 1.8em;
+            font-weight: 900;
+            line-height: 1;
+            color: #000;
+        }
+        .date-badge .month {
+            display: block;
+            font-size: 0.8em;
+            text-transform: uppercase;
+            font-weight: 700;
+            color: var(--brand-color);
+            letter-spacing: 1px;
+        }
+
+        /* Cuerpo de la Tarjeta */
+        .card-body {
+            padding: 25px;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .event-title {
+            font-weight: 800;
+            font-size: 1.4em;
+            margin-top: 0;
+            margin-bottom: 15px;
+            color: var(--text-main);
+            line-height: 1.2;
+            display: -webkit-box;
+            -webkit-line-clamp: 2; /* Limita a 2 lineas */
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .event-info {
+            font-size: 0.95em;
+            color: #666;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+        }
+
+        .event-info i {
+            width: 25px;
+            color: var(--brand-color);
+            text-align: center;
+            margin-right: 10px;
+        }
+
+        /* --- BOTÓN DE COMPRA --- */
+        .buy-btn {
+            background: #000;
+            color: #fff;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 700;
+            padding: 15px;
+            border-radius: 50px; /* Botón píldora moderno */
+            transition: all 0.3s ease;
+            border: 2px solid #000;
+            margin-top: 20px;
+            display: block;
+            text-align: center;
+        }
+
+        .buy-btn:hover, .buy-btn:focus {
+            background: var(--brand-color);
+            border-color: var(--brand-color);
+            color: #fff;
+            text-decoration: none;
+            box-shadow: 0 5px 20px rgba(255, 102, 0, 0.4);
+        }
+
+        /* --- Header y Footer Polish --- */
+        .page-header-section {
+            padding: 60px 0 40px;
+            position: relative;
+        }
+        .section-line {
+            width: 60px;
+            height: 4px;
+            background: var(--brand-color);
+            margin: 20px auto;
+            border-radius: 2px;
+        }
+    </style>
+</head>
+
+<body class="home">
+
+<header class="sticky" style="background-color: #000; padding: 10px 0; border-bottom: 1px solid #222;">
+  <div class="container">
+    <a href="{% url 'home' %}" class="logo">
+      <img src="https://images.jumpseller.com/store/cevichestudios/store/logo/CEVISTIKER_NARANJA__1_.png?1738101719" alt="CevicheStudios" style="max-height: 50px; margin-top: 5px;"/>
+    </a>
+    
+    <nav class="main-nav hidden-md hidden-sm hidden-xs pull-right" style="margin-top: 15px;">
+      <div class="minimal-menu">
+        <ul class="menu list-inline" style="font-family: 'Montserrat', sans-serif; font-weight: 600;">
+          <li><a href="{% url 'home' %}" style="color: #aaa; text-decoration: none; transition: 0.3s;">INICIO</a></li>
+          <li><a href="{% url 'public_events' %}" style="color: #fff; border-bottom: 2px solid #ff6600; padding-bottom: 5px; text-decoration: none;">EVENTOS</a></li>
+          <li><a href="{% url 'boleteria' %}" style="color: #aaa; text-decoration: none; transition: 0.3s;">BOLETERÍA</a></li>
+          <li><a href="/cart/" style="color: #fff; font-size: 1.2em;"><i class="fas fa-shopping-cart"></i></a></li>
+        </ul>
+      </div>
+    </nav>
+  </div>
+</header>
+
+<div class="container" style="min-height: 80vh;">
+    
+    <div class="text-center page-header-section">
+        <h2 style="font-weight: 900; font-size: 3em; text-transform: uppercase; color: #111; letter-spacing: -1px; margin-bottom: 0;">
+            Cartelera <span style="color: var(--brand-color);">Oficial</span>
+        </h2>
+        <div class="section-line"></div>
+        <p class="text-muted" style="font-size: 1.2em; font-weight: 300;">Explora las experiencias únicas que hemos creado para ti.</p>
+    </div>
+
+    {% if events %}
+        <div class="row display-flex" style="display: flex; flex-wrap: wrap;">
+            {% for event in events %}
+            <div class="col-md-4 col-sm-6" style="margin-bottom: 30px;">
+                <article class="event-card">
+                    
+                    <div class="event-poster-container">
+                        <div class="date-badge">
+                            <span class="day">{{ event.date_time|date:"d" }}</span>
+                            <span class="month">{{ event.date_time|date:"M" }}</span>
+                        </div>
+
+                        {% if event.poster %}
+                            <img src="{{ event.poster.url }}" alt="{{ event.name }}" class="event-poster">
+                        {% elif event.poster_url %}
+                            <img src="{{ event.poster_url }}" alt="{{ event.name }}" class="event-poster">
+                        {% else %}
+                            <div class="event-placeholder" style="height:100%; display:flex; align-items:center; justify-content:center; background:#222; color:#444;">
+                                <i class="fas fa-ticket-alt fa-4x"></i>
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="card-body">
+                        <div>
+                            <h3 class="event-title">{{ event.name }}</h3>
+                            
+                            <div class="event-info">
+                                <i class="far fa-clock"></i>
+                                <span>{{ event.date_time|date:"l" }} • {{ event.date_time|time:"h:i A" }}</span>
+                            </div>
+                            
+                            <div class="event-info">
+                                <i class="fas fa-map-marker-alt"></i>
+                                <span>{{ event.venue.name|default:"Ubicación por confirmar" }}</span>
+                            </div>
+                        </div>
+
+                        <a href="{% url 'event_detail' event.id %}" class="buy-btn">
+                            Reservar Entrada <i class="fas fa-arrow-right" style="margin-left: 8px; font-size: 0.8em;"></i>
+                        </a>
+                    </div>
+                </article>
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="text-center" style="padding: 80px 20px; background: #fff; border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.03); margin-top: 20px;">
+            <div style="width: 80px; height: 80px; background: #FFF0E6; color: #ff6600; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 20px;">
+                <i class="fas fa-calendar-times fa-2x"></i>
+            </div>
+            <h3 style="font-weight: 800;">No hay funciones disponibles</h3>
+            <p class="text-muted" style="max-width: 400px; margin: 0 auto 30px;">Actualmente estamos preparando la próxima temporada de eventos. Suscríbete para ser el primero en saber.</p>
+            <a href="{% url 'home' %}" class="btn btn-default" style="padding: 10px 25px; border-radius: 50px; font-weight: 600;">Volver al Inicio</a>
+        </div>
+    {% endif %}
+
+</div>
+
+<footer style="background-color: #000; color: #fff; padding: 60px 0 30px; margin-top: 50px; border-top: 5px solid #ff6600;">
+  <div class="container text-center">
+    <div class="row">
+      <div class="col-md-8 col-md-offset-2">
+        <h4 style="letter-spacing: 2px; text-transform: uppercase; margin-bottom: 30px; color: #555;">Conecta con nosotros</h4>
+        
+        <ul class="list-inline" style="margin-bottom: 30px;">
+            <li><a href="https://www.instagram.com/cevichestudios" target="_blank" class="social-icon"><i class="fab fa-instagram"></i></a></li>
+            <li><a href="https://www.facebook.com/cevichestudios" target="_blank" class="social-icon"><i class="fab fa-facebook-f"></i></a></li>
+            <li><a href="https://api.whatsapp.com/send?phone=573223001638" target="_blank" class="social-icon"><i class="fab fa-whatsapp"></i></a></li>
+        </ul>
+        
+        <p style="color: #444; font-size: 0.85em;">
+            © 2026 CevicheStudios. Tecnología de boletería segura.<br>
+            Todos los derechos reservados.
+        </p>
+      </div>
+    </div>
+  </div>
+  <style>
+      .social-icon {
+          width: 50px; height: 50px;
+          display: inline-flex; align-items: center; justify-content: center;
+          background: #222; color: #fff;
+          border-radius: 50%;
+          font-size: 1.2em;
+          transition: all 0.3s;
+          margin: 0 5px;
+      }
+      .social-icon:hover {
+          background: #ff6600; color: #fff; transform: translateY(-5px);
+      }
+  </style>
+</footer>
+
+<script src="http://code.jquery.com/ui/1.11.4/jquery-ui.min.js"></script>
+<script src="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
+
+</body>
+</html>

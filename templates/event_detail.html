@@ -1,0 +1,773 @@
+{% extends 'base.html' %} 
+{% load humanize static %}
+
+{% block title %}{{ event_name }} | Selección de Asientos{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/@sweetalert2/theme-dark@4/dark.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+
+<style>
+    /* === 1. ARQUITECTURA VISUAL (VARIABLES) === */
+    :root {
+        --color-primary: #00E676; /* Verde Neon */
+        --color-vip: #FFD700;     /* Dorado */
+        --color-sold: #2c2c2c;    /* Gris Apagado */
+        --color-bg: #050505;      /* Negro Profundo */
+        --color-surface: #141414; /* Gris Superficie */
+        --seat-size: 34px;        /* Tamaño Optimizado */
+    }
+
+    body {
+        font-family: 'Inter', sans-serif;
+        background-color: var(--color-bg);
+        overflow-x: hidden; /* Evitar scroll horizontal global */
+    }
+
+    .booking-container {
+        display: flex;
+        flex-wrap: wrap;
+        min-height: calc(100vh - 80px); /* Altura completa menos header */
+        position: relative;
+    }
+
+    /* === 2. ÁREA DEL MAPA (CONTENEDOR INTELIGENTE) === */
+    .map-section {
+        flex: 1;
+        position: relative;
+        background: radial-gradient(circle at center, #1a1a1a 0%, #000 100%);
+        overflow: hidden; /* Oculta lo que se salga del borde */
+        height: 100%;
+        min-height: 600px;
+        cursor: grab;
+        touch-action: none; /* VITAL: Desactiva gestos nativos del navegador */
+        user-select: none;
+    }
+    .map-section:active { cursor: grabbing; }
+
+    /* Lienzo de Renderizado (El objeto que se mueve) */
+    #seat-map-render {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 0; height: 0; /* El tamaño lo definen los hijos */
+        transform-origin: 0 0; /* EL SECRETO MATEMÁTICO: Origen en (0,0) */
+        will-change: transform; /* Optimización GPU */
+        /* Transición suave solo si NO estamos arrastrando (se controla por JS) */
+        transition: transform 0.1s cubic-bezier(0.1, 0.7, 1.0, 0.1); 
+    }
+
+    /* === 3. SILLAS REALISTAS === */
+    .seat {
+        position: absolute; 
+        width: var(--seat-size);
+        height: var(--seat-size);
+        background-color: #333;
+        border-radius: 8px 8px 12px 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        font-weight: 700;
+        color: rgba(255,255,255,0.6);
+        transition: transform 0.2s, background 0.2s, box-shadow 0.2s;
+        box-shadow: 0 4px 0 #1a1a1a;
+        z-index: 10;
+        /* Centrar punto de anclaje visualmente */
+        transform: translate(-50%, -50%); 
+    }
+
+    .seat:hover:not(.sold) {
+        transform: translate(-50%, -65%) scale(1.3);
+        background-color: #555;
+        color: white;
+        z-index: 100;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.7);
+        border: 1px solid rgba(255,255,255,0.2);
+    }
+
+    .seat.selected {
+        background-color: var(--color-primary);
+        color: #000;
+        box-shadow: 0 0 15px var(--color-primary);
+        border: 1px solid #fff;
+        z-index: 50;
+        transform: translate(-50%, -50%) scale(1.1);
+    }
+
+    .seat.vip {
+        border-top: 3px solid var(--color-vip);
+    }
+    .seat.vip::before {
+        content: '';
+        position: absolute;
+        bottom: -5px; left: 50%; transform: translateX(-50%);
+        width: 4px; height: 4px; border-radius: 50%;
+        background: var(--color-vip);
+    }
+
+    .seat.sold {
+        background-color: var(--color-sold);
+        color: transparent;
+        box-shadow: none;
+        cursor: not-allowed;
+        opacity: 0.4;
+    }
+    .seat.sold::after {
+        content: "✕"; color: #555; font-size: 14px;
+    }
+
+    /* Etiquetas de Bloque */
+    .block-label {
+        position: absolute;
+        color: rgba(255,255,255,0.15);
+        font-size: 40px;
+        font-weight: 900;
+        text-transform: uppercase;
+        pointer-events: none;
+        transform: translate(-50%, -50%);
+        white-space: nowrap;
+        z-index: 1;
+    }
+
+    /* === 4. UI FLOTANTE === */
+    .map-controls {
+        position: absolute;
+        bottom: 30px;
+        right: 30px; /* Cambiado a derecha para ergonomía */
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        z-index: 200;
+    }
+    
+    .ctrl-btn {
+        width: 40px; height: 40px;
+        border-radius: 8px;
+        background: white;
+        border: none;
+        color: #000;
+        cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 16px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        transition: 0.2s;
+    }
+    .ctrl-btn:hover { background: var(--color-primary); transform: scale(1.05); }
+
+    .legend {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        background: rgba(20,20,20,0.85);
+        padding: 15px;
+        border-radius: 12px;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255,255,255,0.1);
+        pointer-events: none;
+        z-index: 200;
+    }
+    .legend-item { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; font-size: 12px; color: #ccc; font-weight: 600; }
+    .dot { width: 10px; height: 10px; border-radius: 3px; }
+
+    /* === 5. SIDEBAR (CARRITO) === */
+    .sidebar-section {
+        width: 380px;
+        background: var(--color-surface);
+        border-left: 1px solid #222;
+        padding: 30px;
+        display: flex;
+        flex-direction: column;
+        z-index: 300;
+        box-shadow: -10px 0 40px rgba(0,0,0,0.5);
+    }
+
+    @media (max-width: 992px) {
+        .booking-container { flex-direction: column; }
+        .sidebar-section { width: 100%; border-left: none; border-top: 1px solid #333; height: auto; min-height: unset; }
+        .map-section { height: 60vh; min-height: 400px; }
+        .map-controls { bottom: 20px; right: 20px; }
+    }
+
+    .tickets-scroll {
+        flex: 1;
+        overflow-y: auto;
+        margin: 20px 0;
+        padding-right: 5px;
+        border-top: 1px solid #2a2a2a;
+        border-bottom: 1px solid #2a2a2a;
+    }
+
+    .ticket-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 0;
+        border-bottom: 1px solid #222;
+        animation: fadeIn 0.3s ease;
+    }
+    @keyframes fadeIn { from { opacity:0; transform:translateX(10px); } to { opacity:1; } }
+
+    .btn-main {
+        width: 100%; padding: 16px;
+        background: white; color: black;
+        font-weight: 800; border: none; border-radius: 6px;
+        font-size: 15px; letter-spacing: 0.5px; text-transform: uppercase;
+        cursor: pointer; transition: all 0.2s;
+    }
+    .btn-main:hover:not(:disabled) { transform: translateY(-2px); background: var(--color-primary); box-shadow: 0 5px 15px rgba(0,230,118,0.3); }
+    .btn-main:disabled { background: #333; color: #666; cursor: not-allowed; }
+
+    /* Tooltip */
+    #tooltip {
+        position: fixed;
+        background: rgba(0,0,0,0.95);
+        color: white;
+        padding: 12px 16px;
+        border-radius: 8px;
+        font-size: 12px;
+        pointer-events: none;
+        display: none;
+        z-index: 9999;
+        border: 1px solid #333;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+        transform: translate(15px, 15px);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="tooltip"></div>
+
+<div class="booking-container">
+    
+    <div class="map-section" id="map-container">
+        
+        <div id="seat-map-render">
+            <div id="loading-msg" class="text-center" style="position:absolute; left: 500px; top: 300px; transform:translate(-50%, -50%); width: 200px;">
+                <i class="fas fa-spinner fa-spin fa-2x text-muted"></i>
+                <p class="mt-2 text-muted" style="font-size:12px;">Cargando Mapa...</p>
+            </div>
+        </div>
+
+        <div class="legend">
+            <div class="legend-item"><div class="dot" style="background:#333"></div> Disponible</div>
+            <div class="legend-item"><div class="dot" style="background:var(--color-primary)"></div> Tu Selección</div>
+            <div class="legend-item"><div class="dot" style="background:var(--color-sold)"></div> Vendido</div>
+            <div class="legend-item"><div class="dot" style="background:#333; border-top:2px solid var(--color-vip)"></div> VIP</div>
+        </div>
+
+        <div class="map-controls">
+            <button class="ctrl-btn" id="zoom-in" title="Acercar"><i class="fas fa-plus"></i></button>
+            <button class="ctrl-btn" id="zoom-out" title="Alejar"><i class="fas fa-minus"></i></button>
+            <button class="ctrl-btn" id="zoom-reset" title="Restablecer"><i class="fas fa-compress-arrows-alt"></i></button>
+        </div>
+    </div>
+
+    <div class="sidebar-section">
+        <div class="event-info">
+            <h5 style="color: var(--color-primary); text-transform:uppercase; font-size:11px; letter-spacing:1px; font-weight:800; margin-bottom:5px;">Compra de Boletas</h5>
+            <h2 style="font-size: 1.6rem; color: white; margin: 0;">{{ event_name }}</h2>
+            <p class="text-muted" style="font-size: 13px; margin-top: 10px; line-height: 1.6;">
+                <i class="far fa-calendar-alt" style="margin-right: 5px;"></i> {{ function.date_time|date:"l d F, Y" }}<br>
+                <i class="fas fa-map-marker-alt" style="margin-right: 5px;"></i> {{ venue.name }}<br>
+                <i class="far fa-clock" style="margin-right: 5px;"></i> {{ function.date_time|date:"h:i A" }}
+            </p>
+        </div>
+
+        <div class="tickets-scroll" id="cart-list">
+            <div class="text-center text-muted" id="empty-state" style="padding-top: 50px; opacity: 0.5;">
+                <i class="fas fa-couch fa-2x mb-3"></i><br>
+                Selecciona tus sillas<br>en el mapa interactivo
+            </div>
+        </div>
+
+        <div class="checkout-area">
+            <div class="d-flex justify-content-between align-items-end mb-3">
+                <span class="text-muted" style="font-size: 14px;">Total a Pagar</span>
+                <span style="font-size: 26px; font-weight: 800; color: white;">
+                    $<span id="total-amount">0</span>
+                </span>
+            </div>
+            
+            <button id="btn-pay" class="btn-main" disabled>Continuar al Pago</button>
+            
+            <div class="text-center mt-3" style="font-size: 10px; color: #444;">
+                <i class="fas fa-shield-alt"></i> Transacción segura encriptada por Wompi
+            </div>
+        </div>
+    </div>
+</div>
+
+<input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<script>
+    // === CONFIGURACIÓN GLOBAL ===
+    const CONFIG = {
+        functionId: "{{ function.id }}",
+        apiUrl: "/api/orders/orders/",
+        csrfToken: document.querySelector('[name=csrfmiddlewaretoken]').value,
+        seatSpacing: 50 // Espacio entre sillas en píxeles
+    };
+
+    // Estado del Mapa y Selección
+    let appState = {
+        selectedSeats: [],
+        map: {
+            scale: 0.8,      // Zoom inicial
+            pointX: 100,     // Posición X inicial
+            pointY: 100,     // Posición Y inicial
+            panning: false,
+            startX: 0,
+            startY: 0
+        }
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+        setupCustomPhysicsEngine(); // 👈 NUEVO MOTOR
+        loadMapData();
+    });
+
+    // =========================================================
+    // 🚀 1. MOTOR DE FÍSICA PERSONALIZADO (ZOOM SUAVE)
+    // =========================================================
+    function setupCustomPhysicsEngine() {
+        const container = document.getElementById('map-container');
+        const content = document.getElementById('seat-map-render');
+        
+        const MIN_SCALE = 0.2;
+        const MAX_SCALE = 5;
+
+        // Renderizado visual (Transform CSS)
+        function updateTransform() {
+            content.style.transform = `translate(${appState.map.pointX}px, ${appState.map.pointY}px) scale(${appState.map.scale})`;
+        }
+
+        // A. ZOOM INTELIGENTE (RUEDA / TRACKPAD)
+        container.addEventListener('wheel', (e) => {
+            e.preventDefault(); // STOP al scroll de la página
+
+            // Coordenadas del mouse relativas al mapa (para hacer zoom hacia el puntero)
+            const rect = container.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            // Calcular posición relativa dentro del sistema escalado
+            const xs = (mouseX - appState.map.pointX) / appState.map.scale;
+            const ys = (mouseY - appState.map.pointY) / appState.map.scale;
+
+            // DETECTOR DE TRACKPAD vs MOUSE
+            // Trackpads dan deltas pequeños (<100), Mouse wheels dan deltas grandes (>100)
+            let delta = -e.deltaY;
+            let factor = 0;
+
+            if (Math.abs(delta) < 50) {
+                // Es un Trackpad: Movimiento suave y continuo
+                factor = delta * 0.01; 
+            } else {
+                // Es un Mouse Wheel: Movimiento por pasos
+                factor = Math.sign(delta) * 0.3;
+            }
+
+            const oldScale = appState.map.scale;
+            let newScale = oldScale + factor;
+
+            // Limitar Zoom (Clamp)
+            if (newScale < MIN_SCALE) newScale = MIN_SCALE;
+            if (newScale > MAX_SCALE) newScale = MAX_SCALE;
+
+            // Ajustar posición para mantener el mouse en el mismo punto relativo
+            appState.map.pointX -= xs * (newScale - oldScale);
+            appState.map.pointY -= ys * (newScale - oldScale);
+            appState.map.scale = newScale;
+
+            updateTransform();
+        }, { passive: false }); // 'passive: false' es obligatorio para e.preventDefault()
+
+        // B. ARRASTRE (PANNING)
+        container.addEventListener('mousedown', (e) => {
+            // Solo click izquierdo
+            if (e.button !== 0) return;
+            e.preventDefault();
+            appState.map.startX = e.clientX - appState.map.pointX;
+            appState.map.startY = e.clientY - appState.map.pointY;
+            appState.map.panning = true;
+            container.style.cursor = 'grabbing';
+            // Quitar transición CSS mientras arrastramos para rendimiento máximo
+            content.style.transition = 'none';
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!appState.map.panning) return;
+            e.preventDefault();
+            appState.map.pointX = e.clientX - appState.map.startX;
+            appState.map.pointY = e.clientY - appState.map.startY;
+            updateTransform();
+        });
+
+        window.addEventListener('mouseup', () => {
+            if (appState.map.panning) {
+                appState.map.panning = false;
+                container.style.cursor = 'grab';
+                // Restaurar transición suave
+                content.style.transition = 'transform 0.1s cubic-bezier(0.1, 0.7, 1.0, 0.1)';
+            }
+        });
+
+        // C. CONTROLES DE BOTONES
+        window.zoomManual = (direction) => {
+            const rect = container.getBoundingClientRect();
+            // Zoom al centro del contenedor
+            const centerX = rect.width / 2;
+            const centerY = rect.height / 2;
+            
+            const xs = (centerX - appState.map.pointX) / appState.map.scale;
+            const ys = (centerY - appState.map.pointY) / appState.map.scale;
+            
+            const factor = direction * 0.4;
+            let newScale = appState.map.scale + factor;
+            
+            if (newScale < MIN_SCALE) newScale = MIN_SCALE;
+            if (newScale > MAX_SCALE) newScale = MAX_SCALE;
+
+            appState.map.pointX -= xs * (newScale - appState.map.scale);
+            appState.map.pointY -= ys * (newScale - appState.map.scale);
+            appState.map.scale = newScale;
+            updateTransform();
+        };
+
+        window.resetMap = () => {
+            appState.map.scale = 0.8;
+            appState.map.pointX = 100;
+            appState.map.pointY = 100;
+            updateTransform();
+        };
+
+        // Bindear botones HTML a funciones
+        document.getElementById('zoom-in').onclick = () => zoomManual(1);
+        document.getElementById('zoom-out').onclick = () => zoomManual(-1);
+        document.getElementById('zoom-reset').onclick = resetMap;
+
+        // Inicializar
+        updateTransform();
+    }
+
+    // =========================================================
+    // 🎨 2. RENDERIZADO DEL MAPA
+    // =========================================================
+    function loadMapData() {
+        const rawJson = '{{ venue_layout_json|safe }}';
+        const container = document.getElementById('seat-map-render');
+        
+        try {
+            // Si viene vacío o null
+            if (!rawJson || rawJson === '[]' || rawJson === '{}') {
+                throw new Error("Mapa vacío");
+            }
+
+            const data = JSON.parse(rawJson);
+            
+            // Limpiar loader
+            const loader = document.getElementById('loading-msg');
+            if(loader) loader.remove();
+
+            if (!data.blocks) return;
+
+            // DIBUJAR BLOQUES
+            data.blocks.forEach(block => {
+                // Crear Grupo Visual para el bloque
+                const blockGroup = document.createElement('div');
+                blockGroup.style.position = 'absolute';
+                blockGroup.style.left = `${block.x}px`;
+                blockGroup.style.top = `${block.y}px`;
+                blockGroup.style.transform = `rotate(${block.rotation || 0}deg)`;
+                
+                // Nombre del Bloque (Zona)
+                if (block.name) {
+                    const label = document.createElement('div');
+                    label.className = 'block-label';
+                    label.innerText = block.name;
+                    label.style.top = '-50px'; // Un poco arriba de las sillas
+                    blockGroup.appendChild(label);
+                }
+
+                // DIBUJAR SILLAS
+                if (block.seats) {
+                    block.seats.forEach(seat => {
+                        const posX = seat.localX * CONFIG.seatSpacing;
+                        const posY = seat.localY * CONFIG.seatSpacing;
+
+                        // Parseo de precio robusto
+                        let finalPrice = 0;
+                        if (seat.price !== undefined && seat.price !== null) {
+                            finalPrice = parseFloat(seat.price);
+                        }
+
+                        const seatEl = createSeatElement({
+                            id: seat.id || `${seat.row}-${seat.num}`, // Fallback ID
+                            label: `${seat.row}-${seat.num}`,
+                            row: seat.row,
+                            num: seat.num,
+                            type: seat.category || seat.type || 'General',
+                            price: finalPrice,
+                            status: seat.status || 'available',
+                            x: posX,
+                            y: posY
+                        });
+
+                        blockGroup.appendChild(seatEl);
+                    });
+                }
+
+                container.appendChild(blockGroup);
+            });
+
+        } catch(e) {
+            console.error("Error cargando mapa:", e);
+            container.innerHTML = `
+                <div class="text-center p-5 text-muted" style="position:absolute; top:200px; left:200px; width:300px;">
+                    <i class="fas fa-exclamation-circle fa-3x mb-3"></i><br>
+                    No hay mapa disponible para este evento.
+                </div>`;
+        }
+    }
+
+    // =========================================================
+    // 💺 3. CREACIÓN DE SILLA (DOM)
+    // =========================================================
+    function createSeatElement(data) {
+        const el = document.createElement('div');
+        
+        // Clases CSS dinámicas
+        let classes = ['seat'];
+        
+        // Detección de VIP (insensible a mayúsculas/minúsculas)
+        const typeStr = (data.type || '').toLowerCase();
+        if(typeStr.includes('vip') || typeStr.includes('preferencial')) {
+            classes.push('vip');
+        }
+
+        if(data.status === 'sold' || data.status === 'unavailable') {
+            classes.push('sold');
+        }
+        
+        el.className = classes.join(' ');
+
+        // Posición Absoluta
+        el.style.left = `${data.x}px`;
+        el.style.top = `${data.y}px`;
+
+        // Datos internos
+        el.dataset.id = data.id;
+        el.innerText = data.num; // Número visible en la silla
+
+        // Eventos
+        // Usamos 'click' estándar porque el motor de física maneja el drag
+        el.addEventListener('click', (e) => {
+            e.stopPropagation(); // Evitar que el click pase al mapa
+            handleSeatClick(el, data);
+        });
+
+        el.addEventListener('mouseenter', (e) => showTooltip(e, data));
+        el.addEventListener('mouseleave', hideTooltip);
+
+        return el;
+    }
+
+    // =========================================================
+    // 🛒 4. LÓGICA DE CARRITO Y SELECCIÓN
+    // =========================================================
+    function handleSeatClick(el, data) {
+        if(el.classList.contains('sold')) return;
+
+        const id = data.id;
+        const exists = appState.selectedSeats.find(s => s.id === id);
+
+        if(exists) {
+            // Deseleccionar
+            el.classList.remove('selected');
+            appState.selectedSeats = appState.selectedSeats.filter(s => s.id !== id);
+        } else {
+            // Validaciones
+            if(appState.selectedSeats.length >= 10) {
+                Swal.fire({
+                    icon: 'warning', 
+                    title: 'Límite Alcanzado', 
+                    text: 'Máximo 10 boletas por compra.',
+                    background: '#222', color: '#fff'
+                });
+                return;
+            }
+            if(data.price <= 0) {
+                // Opcional: Permitir gratis o mostrar alerta
+                // Por ahora permitimos, pero podría ser un error de configuración
+            }
+
+            // Seleccionar
+            el.classList.add('selected');
+            appState.selectedSeats.push(data);
+        }
+        renderCart();
+    }
+
+    function renderCart() {
+        const list = document.getElementById('cart-list');
+        const totalEl = document.getElementById('total-amount');
+        const btn = document.getElementById('btn-pay');
+        const empty = document.getElementById('empty-state');
+
+        list.innerHTML = '';
+        let total = 0;
+
+        if(appState.selectedSeats.length === 0) {
+            list.appendChild(empty);
+            totalEl.innerText = '0';
+            btn.disabled = true;
+            return;
+        }
+
+        // Ordenar: Primero Fila, luego Número
+        appState.selectedSeats.sort((a,b) => {
+            if(a.row === b.row) return parseInt(a.num) - parseInt(b.num);
+            return a.row.localeCompare(b.row);
+        });
+
+        appState.selectedSeats.forEach(seat => {
+            total += seat.price;
+            
+            const row = document.createElement('div');
+            row.className = 'ticket-row';
+            row.innerHTML = `
+                <div>
+                    <div style="font-weight:700; color:white; font-size:14px;">
+                        <span style="color:#666">FILA</span> ${seat.row} - <span style="color:#666">SILLA</span> ${seat.num}
+                    </div>
+                    <small style="color:var(--color-primary); font-size:11px; text-transform:uppercase;">
+                        ${seat.type}
+                    </small>
+                </div>
+                <div style="text-align:right;">
+                    <div style="color:white; font-weight:bold;">$${seat.price.toLocaleString()}</div>
+                    <i class="fas fa-trash-alt text-danger" style="cursor:pointer; font-size:12px; margin-top:5px;" onclick="removeSeat('${seat.id}')"></i>
+                </div>
+            `;
+            // Necesitamos un helper global para el onclick inline, 
+            // o mejor, añadir el evento programáticamente:
+            row.querySelector('.fa-trash-alt').onclick = (e) => {
+                e.stopPropagation();
+                // Simular click en la silla del mapa para deseleccionar
+                const seatMapEl = document.querySelector(`.seat[data-id="${seat.id}"]`);
+                if(seatMapEl) seatMapEl.click();
+            };
+
+            list.appendChild(row);
+        });
+
+        totalEl.innerText = total.toLocaleString();
+        btn.disabled = false;
+    }
+
+    // =========================================================
+    // ℹ️ 5. TOOLTIPS
+    // =========================================================
+    const tooltip = document.getElementById('tooltip');
+    
+    function showTooltip(e, data) {
+        const priceDisplay = data.price > 0 ? `$${data.price.toLocaleString()}` : 'No disponible';
+        
+        tooltip.style.display = 'block';
+        tooltip.innerHTML = `
+            <div style="color:var(--color-primary); font-weight:800; text-transform:uppercase; margin-bottom:2px;">
+                ${data.type}
+            </div>
+            <div style="font-size:13px; margin-bottom:2px;">
+                Fila <b>${data.row}</b> - Silla <b>${data.num}</b>
+            </div>
+            <div style="font-weight:bold; color:#fff; border-top:1px solid #444; padding-top:2px; margin-top:2px;">
+                ${priceDisplay}
+            </div>
+        `;
+        // Posicionar tooltip inicialmente
+        moveTooltip(e);
+    }
+    
+    function moveTooltip(e) {
+        // Offset simple
+        tooltip.style.left = (e.clientX + 15) + 'px';
+        tooltip.style.top = (e.clientY + 15) + 'px';
+    }
+    
+    function hideTooltip() { 
+        tooltip.style.display = 'none'; 
+    }
+
+    document.addEventListener('mousemove', (e) => {
+        if(tooltip.style.display === 'block') moveTooltip(e);
+    });
+
+    // =========================================================
+    // 💳 6. INTEGRACIÓN PAGOS (WOMPI)
+    // =========================================================
+    document.getElementById('btn-pay').addEventListener('click', async () => {
+        const btn = document.getElementById('btn-pay');
+        
+        // Bloquear botón
+        btn.disabled = true;
+        const originalText = btn.innerText;
+        btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> PROCESANDO...';
+
+        try {
+            // 1. Crear Orden en Backend
+            const res = await fetch(CONFIG.apiUrl, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json', 
+                    'X-CSRFToken': CONFIG.csrfToken 
+                },
+                body: JSON.stringify({
+                    function_id: CONFIG.functionId,
+                    seat_labels: appState.selectedSeats.map(s => s.label),
+                    products: [] // Futura expansión para combos
+                })
+            });
+
+            const json = await res.json();
+
+            if(!res.ok) {
+                throw new Error(json.error || 'Error al crear la orden');
+            }
+
+            // 2. Redirigir a Wompi Checkout
+            // Construcción segura de URL
+            const wompiUrl = new URL("https://checkout.wompi.co/p/");
+            wompiUrl.searchParams.append("public-key", json.wompi_public_key);
+            wompiUrl.searchParams.append("currency", json.wompi_currency);
+            wompiUrl.searchParams.append("amount-in-cents", json.amount_in_cents);
+            wompiUrl.searchParams.append("reference", json.reference);
+            wompiUrl.searchParams.append("signature:integrity", json.wompi_signature);
+            wompiUrl.searchParams.append("redirect-url", `${window.location.origin}/orders/${json.id}/status`);
+
+            window.location.href = wompiUrl.toString();
+
+        } catch (err) {
+            console.error(err);
+            Swal.fire({
+                icon: 'error', 
+                title: 'No se pudo iniciar el pago', 
+                text: err.message, 
+                background: '#222', color: '#fff'
+            });
+            
+            // Restaurar botón
+            btn.disabled = false;
+            btn.innerText = originalText;
+        }
+    });
+
+</script>
+{% endblock %}

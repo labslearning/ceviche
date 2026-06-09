@@ -1,0 +1,203 @@
+{% load static %}
+<!DOCTYPE html>
+<html class="no-js" lang="es-CO">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
+    <title>{% block title %}Ceviche Studios | Experiencias Multimedia{% endblock %}</title>
+    <meta name="description" content="{% block meta_description %}Producción multimedia, eventos y experiencias de marca en Bogotá.{% endblock %}">
+    <meta name="author" content="Ceviche Studios">
+    
+    <meta property="og:title" content="{% block og_title %}Ceviche Studios{% endblock %}">
+    <meta property="og:description" content="{% block og_description %}Llevamos tus ideas al siguiente nivel.{% endblock %}">
+    <meta property="og:image" content="{% block og_image %}https://images.jumpseller.com/store/cevichestudios/store/logo/CEVISTIKER_NARANJA__1_.png?1738101719{% endblock %}">
+    <meta property="og:url" content="{{ request.build_absolute_uri }}">
+    <meta property="og:type" content="website">
+
+    <link rel="shortcut icon" href="https://cdnx.jumpseller.com/cevichestudios/image/48989091/resize/32/32?1716310320" type="image/png">
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/glyphicons-halflings@1.9.0/css/glyphicons-halflings.min.css">
+    <link href="https://assets.jumpseller.com/public/pe-icon-7-stroke/0.1.0/pe-icon-7-stroke.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.7.0/animate.min.css" rel="stylesheet">
+    <link href="https://assets.jumpseller.com/public/themes/influence/bootstrap_3.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    
+    <link href="https://assets.jumpseller.com/store/cevichestudios/themes/638214/app.min.css?1758591088" rel="stylesheet">
+
+    <style>
+        :root {
+            --brand-primary: #ff6b6b; /* Naranja Ceviche */
+            --brand-dark: #000000;
+            --brand-gray: #25282C;
+            --text-light: #FBFBFB;
+        }
+
+        body { 
+            padding-top: 80px; 
+            background-color: var(--brand-dark); 
+            color: var(--text-light); 
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            -webkit-font-smoothing: antialiased; /* Texto más nítido en Mac */
+        }
+
+        /* Header Profesional con Transición */
+        header.sticky { 
+            background-color: rgba(0, 0, 0, 0.95); 
+            backdrop-filter: blur(10px); /* Efecto vidrio esmerilado moderno */
+            transition: all 0.3s ease;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        header a.logo, header .main-nav a { color: var(--text-light) !important; }
+        
+        /* Preloader */
+        #preloader {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; z-index: 9999;
+            display: flex; justify-content: center; align-items: center;
+        }
+        .spinner {
+            width: 50px; height: 50px;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: var(--brand-primary);
+            animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Footer */
+        footer a { transition: color 0.3s; color: #aaa; text-decoration: none; }
+        footer a:hover { color: var(--brand-primary); }
+        
+        /* Mejoras Main Content */
+        .main-content-wrapper { 
+            min-height: 80vh; 
+            position: relative;
+            z-index: 1;
+        }
+    </style>
+
+    {% block extra_css %}{% endblock %}
+</head>
+
+<body class="home">
+
+    <div id="preloader">
+        <div class="spinner"></div>
+    </div>
+
+    <header class="sticky">
+        <div class="container">
+            <a href="/" class="logo">
+                <h1><img src="https://images.jumpseller.com/store/cevichestudios/store/logo/CEVISTIKER_NARANJA__1_.png?1738101719" alt="CevicheStudios" style="max-height: 50px;"/></h1>
+            </a>
+            
+            <div class="top-cart">
+                <a id="cart-link" href="{% url 'cart_view'|default:'/cart/' %}">
+                    <i class="pe-7s-cart"></i>
+                    <span class="cart-size">{% if request.session.cart_count %}{{ request.session.cart_count }}{% else %}0{% endif %}</span>
+                </a>
+            </div>
+            
+            <button type="button" class="navbar-toggle collapsed visible-xs visible-sm" data-toggle="collapse" data-target="#mobile-menu">
+                <span class="sr-only">Menú</span>
+                <i class="fas fa-bars fa-2x"></i>
+            </button>
+
+            <nav class="main-nav hidden-md hidden-sm hidden-xs">
+                <div class="minimal-menu">
+                    <ul class="menu">
+                        <li><a href="{% url 'public_events' %}">Eventos</a></li>
+                        <li><a href="/boleteria/">Boletería</a></li>
+                        <li><a href="/merch/">Merch</a></li>
+                        <li><a href="/contacto/">Contacto</a></li>
+                        {% if user.is_authenticated %}
+                            <li><a href="/manager/" style="color: var(--brand-primary)!important;">Mi Cuenta</a></li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </nav>
+        </div>
+        
+        <div id="mobile-menu" class="collapse navbar-collapse bg-inverse visible-xs visible-sm" style="background:#111; padding:20px;">
+            <ul class="nav navbar-nav">
+                <li><a href="{% url 'public_events' %}">Eventos</a></li>
+                <li><a href="/boleteria/">Boletería</a></li>
+                <li><a href="/merch/">Merch</a></li>
+                <li><a href="/contacto/">Contacto</a></li>
+            </ul>
+        </div>
+    </header>
+
+    {% if messages %}
+    <div class="container" style="position:fixed; top:100px; right:20px; z-index:9999; max-width:300px;">
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade in" role="alert" style="box-shadow: 0 5px 15px rgba(0,0,0,0.5);">
+                <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">×</span></button>
+                <strong>{{ message.tags|title }}:</strong> {{ message }}
+            </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="main-content-wrapper">
+        {% block content %}
+        {% endblock %}
+    </div>
+
+    <footer>
+        <div class="container">
+            <div class="row" style="padding: 60px 0;">
+                <div class="col-sm-4 col-xs-12">
+                    <h3 style="color: var(--brand-primary); font-size: 14px; letter-spacing: 2px;">SÍGUENOS</h3>
+                    <ul class="list-social list-inline" style="font-size: 20px; margin-top: 15px;">
+                        <li><a href="https://www.instagram.com/cevichestudios" target="_blank"><i class="fab fa-instagram"></i></a></li>
+                        <li><a href="https://www.facebook.com/cevichestudios" target="_blank"><i class="fab fa-facebook-f"></i></a></li>
+                        <li><a href="https://api.whatsapp.com/send?phone=573223001638" target="_blank"><i class="fab fa-whatsapp"></i></a></li>
+                    </ul>
+                </div>
+                <div class="col-sm-4 col-xs-12">
+                    <h3 style="color: var(--brand-primary); font-size: 14px; letter-spacing: 2px;">CONTACTO</h3>
+                    <p style="color: #888; margin-top: 15px;">
+                        Bogotá, Colombia<br>
+                        <a href="mailto:hola@cevichestudios.com" style="color:#aaa">hola@cevichestudios.com</a>
+                    </p>
+                </div>
+                <div class="col-sm-4 col-xs-12">
+                    <h3 style="color: var(--brand-primary); font-size: 14px; letter-spacing: 2px;">LEGAL</h3>
+                    <ul class="list-unstyled" style="margin-top: 15px; font-size: 13px;">
+                        <li><a href="#">Términos y Condiciones</a></li>
+                        <li><a href="#">Política de Privacidad</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="bottom-footer" style="background:var(--brand-gray); padding: 15px 0; text-align: center; font-size: 12px; color: #666;">
+            <div class="container">
+                © {% now "Y" %} Ceviche Studios. Power by <span style="color:var(--brand-primary)">Hydra Code</span>.
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
+
+    <script>
+        $(window).load(function() {
+            // Desaparecer preloader cuando carga todo
+            $("#preloader").fadeOut("slow");
+        });
+
+        // Auto-cerrar alertas después de 5 segundos
+        window.setTimeout(function() {
+            $(".alert").fadeTo(500, 0).slideUp(500, function(){
+                $(this).remove(); 
+            });
+        }, 5000);
+    </script>
+
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

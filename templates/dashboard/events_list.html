@@ -1,0 +1,601 @@
+{% extends 'dashboard/base_dashboard.html' %}
+
+{% block title %}Gestión de Eventos{% endblock %}
+
+{% block content %}
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 animate-fade-in-down">
+    <div class="glass-panel p-4 rounded-xl border border-slate-700/50 flex items-center justify-between">
+        <div>
+            <p class="text-xs text-slate-400 uppercase font-bold tracking-wider">Total Eventos</p>
+            <h3 class="text-2xl font-mono font-bold text-white">{{ total_count|default:"0" }}</h3>
+        </div>
+        <div class="w-10 h-10 rounded-full bg-brand-500/10 flex items-center justify-center text-brand-400">
+            <i class="fa-solid fa-calendar-days"></i>
+        </div>
+    </div>
+    
+    <div class="glass-panel p-4 rounded-xl border border-slate-700/50 flex items-center justify-between">
+        <div>
+            <p class="text-xs text-slate-400 uppercase font-bold tracking-wider">En Cartelera</p>
+            <h3 class="text-2xl font-mono font-bold text-emerald-400">{{ active_count|default:"0" }}</h3>
+        </div>
+        <div class="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-400">
+            <i class="fa-solid fa-check-circle"></i>
+        </div>
+    </div>
+
+    <div class="glass-panel p-4 rounded-xl border border-slate-700/50 flex items-center justify-between">
+        <div>
+            <p class="text-xs text-slate-400 uppercase font-bold tracking-wider">Destacados</p>
+            <h3 class="text-2xl font-mono font-bold text-amber-400">{{ featured_count|default:"0" }}</h3>
+        </div>
+        <div class="w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-400">
+            <i class="fa-solid fa-star"></i>
+        </div>
+    </div>
+</div>
+
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-6">
+    <div>
+        <h2 class="text-2xl font-bold text-white tracking-tight">Catálogo de Espectáculos</h2>
+        <p class="text-slate-400">Administra la información pública, precios y configuración de eventos.</p>
+    </div>
+    
+    <a href="{% url 'dashboard:theater_editor' %}" class="bg-brand-600 hover:bg-brand-500 text-white px-5 py-2.5 rounded-lg shadow-lg shadow-brand-500/20 transition-all hover:scale-105 active:scale-95 flex items-center gap-2 font-medium decoration-0">
+        <i class="fa-solid fa-plus"></i> Nuevo Evento
+    </a>
+</div>
+
+<div class="glass-panel p-4 rounded-xl mb-8 border border-slate-700/50 shadow-xl">
+    <form method="get" class="flex flex-col md:flex-row gap-4">
+        
+        <div class="relative flex-1">
+            <i class="fa-solid fa-search absolute left-4 top-3.5 text-slate-500"></i>
+            <input type="text" name="q" value="{{ search_query }}" 
+                placeholder="Buscar por título, descripción o slug..." 
+                class="w-full bg-slate-900/50 border border-slate-700 rounded-lg pl-11 pr-10 py-3 text-slate-200 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all">
+            
+            {% if search_query %}
+            <a href="{% url 'dashboard:event_list' %}" class="absolute right-3 top-3.5 text-slate-500 hover:text-red-400 transition-colors" title="Limpiar búsqueda">
+                <i class="fa-solid fa-times-circle"></i>
+            </a>
+            {% endif %}
+        </div>
+
+        <div class="w-full md:w-56 relative">
+            <i class="fa-solid fa-filter absolute left-4 top-3.5 text-slate-500 z-10"></i>
+            <select name="status" onchange="this.form.submit()"
+                class="w-full bg-slate-900/50 border border-slate-700 rounded-lg pl-10 pr-8 py-3 text-slate-200 focus:outline-none focus:border-brand-500 cursor-pointer appearance-none">
+                <option value="all" {% if current_status == 'all' %}selected{% endif %}>Todos los Estados</option>
+                <option value="active" {% if current_status == 'active' %}selected{% endif %}>En Cartelera</option>
+                <option value="inactive" {% if current_status == 'inactive' %}selected{% endif %}>Inactivos</option>
+                <option value="featured" {% if current_status == 'featured' %}selected{% endif %}>⭐ Destacados</option>
+            </select>
+            <i class="fa-solid fa-chevron-down absolute right-4 top-4 text-xs text-slate-500 pointer-events-none"></i>
+        </div>
+    </form>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    
+    {% for event in events %}
+    <div class="glass-panel rounded-xl border border-slate-700/50 overflow-hidden group hover:border-brand-500/50 hover:shadow-2xl hover:shadow-brand-500/10 transition-all duration-300 relative flex flex-col h-full">
+        
+        <div class="h-48 bg-slate-800 relative overflow-hidden">
+            {% if event.poster %}
+                <img src="{{ event.poster.url }}" alt="{{ event.name }}" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all duration-700">
+            {% else %}
+                <div class="w-full h-full flex items-center justify-center bg-slate-800 pattern-grid-lg text-slate-700">
+                    <i class="fa-solid fa-image text-5xl opacity-50"></i>
+                </div>
+            {% endif %}
+            
+            <div class="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/40 to-transparent"></div>
+
+            <div class="absolute top-3 right-3 flex gap-2">
+                {% if event.active %}
+                    <span class="px-3 py-1 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 backdrop-blur-md shadow-lg">
+                        <i class="fa-solid fa-circle text-[6px] mr-1 align-middle animate-pulse"></i> LIVE
+                    </span>
+                {% else %}
+                    <span class="px-3 py-1 rounded-full text-[10px] font-bold bg-slate-500/20 text-slate-300 border border-slate-500/30 backdrop-blur-md shadow-lg">
+                        OFFLINE
+                    </span>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="p-5 flex-1 flex flex-col">
+            <h3 class="text-xl font-bold text-white mb-2 leading-tight group-hover:text-brand-400 transition-colors">{{ event.name }}</h3>
+            
+            <div class="flex flex-col gap-1.5 mb-4">
+                <div class="text-xs font-bold text-brand-500 uppercase tracking-wider flex items-center gap-2">
+                    <i class="fa-solid fa-location-dot"></i> {{ event.venue.name }}
+                </div>
+                <div class="text-xs text-slate-500 font-mono flex items-center gap-2">
+                    <i class="fa-regular fa-clock"></i> {{ event.date_time|date:"d M Y, h:i A" }}
+                </div>
+            </div>
+            
+            <p class="text-sm text-slate-400 mb-6 line-clamp-2 flex-1">
+                {{ event.description|default:"Sin descripción disponible." }}
+            </p>
+            
+            <div class="grid grid-cols-3 gap-2 mb-4 p-3 rounded-lg bg-slate-800/50 border border-slate-700/50">
+                <div class="text-center">
+                    <div class="text-[9px] text-slate-500 uppercase font-bold">Total</div>
+                    <div class="font-mono text-white font-bold">{{ event.total_seats|default:"0" }}</div>
+                </div>
+                <div class="text-center border-l border-slate-700/50">
+                    <div class="text-[9px] text-slate-500 uppercase font-bold">Vendido</div>
+                    <div class="font-mono text-brand-400 font-bold">{{ event.sold_seats|default:"0" }}</div>
+                </div>
+                <div class="text-center border-l border-slate-700/50">
+                    <div class="text-[9px] text-slate-500 uppercase font-bold">Libre</div>
+                    <div class="font-mono text-emerald-400">{{ event.available_seats|default:"0" }}</div>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-between pt-4 border-t border-slate-700/50 mt-auto gap-3">
+                <button onclick="openEventDetails('{{ event.id }}')" class="flex-1 px-4 py-2 rounded-lg bg-slate-800 border border-slate-600 hover:bg-slate-700 hover:text-white text-slate-300 transition-all text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-chart-pie"></i> Telemetría
+                </button>
+                
+                <button onclick="openEditModal('{{ event.id }}')" class="px-3 py-2 rounded-lg bg-brand-600 hover:bg-brand-500 text-white transition-all shadow-lg shadow-brand-500/20 border border-transparent cursor-pointer" title="Editar Evento y Precios">
+                    <i class="fa-solid fa-pen"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="col-span-full py-24 flex flex-col items-center justify-center text-center text-slate-500 border-2 border-dashed border-slate-800 rounded-xl bg-slate-900/30">
+        <div class="w-24 h-24 rounded-full bg-slate-800 flex items-center justify-center mb-6 shadow-inner border border-slate-700">
+            <i class="fa-solid fa-masks-theater text-5xl text-slate-600"></i>
+        </div>
+        <h3 class="text-xl font-bold text-slate-300 mb-2">No se encontraron eventos</h3>
+        <p class="text-sm text-slate-500 max-w-md mx-auto mb-6">Prueba ajustando los filtros de búsqueda o crea un nuevo evento para comenzar a vender.</p>
+        <a href="{% url 'dashboard:theater_editor' %}" class="btn btn-primary px-6 py-2.5">
+            <i class="fa-solid fa-plus mr-2"></i> Crear Primer Evento
+        </a>
+    </div>
+    {% endfor %}
+</div>
+
+{% if is_paginated %}
+<div class="mt-10 flex items-center justify-center gap-4">
+    {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}&q={{ search_query }}&status={{ current_status }}" 
+           class="px-5 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-all flex items-center gap-2 text-sm font-bold">
+           <i class="fa-solid fa-chevron-left text-xs"></i> Anterior
+        </a>
+    {% else %}
+        <span class="px-5 py-2.5 bg-slate-900/50 border border-slate-800 rounded-lg text-slate-600 flex items-center gap-2 cursor-not-allowed text-sm font-bold opacity-50">
+            <i class="fa-solid fa-chevron-left text-xs"></i> Anterior
+        </span>
+    {% endif %}
+
+    <span class="text-xs text-slate-500 font-mono bg-slate-800/50 px-4 py-2 rounded-lg border border-slate-700">
+        PÁGINA <span class="text-white font-bold">{{ page_obj.number }}</span> DE {{ page_obj.paginator.num_pages }}
+    </span>
+
+    {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}&q={{ search_query }}&status={{ current_status }}" 
+           class="px-5 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-all flex items-center gap-2 text-sm font-bold">
+           Siguiente <i class="fa-solid fa-chevron-right text-xs"></i>
+        </a>
+    {% else %}
+        <span class="px-5 py-2.5 bg-slate-900/50 border border-slate-800 rounded-lg text-slate-600 flex items-center gap-2 cursor-not-allowed text-sm font-bold opacity-50">
+            Siguiente <i class="fa-solid fa-chevron-right text-xs"></i>
+        </span>
+    {% endif %}
+</div>
+{% endif %}
+
+<div id="modal-details" class="fixed inset-0 bg-black/95 backdrop-blur-xl z-[9999] hidden flex items-center justify-center p-4 transition-all duration-300">
+    <div class="bg-[#0f0f11] border border-white/10 w-full max-w-5xl h-[85vh] rounded-2xl shadow-2xl relative flex flex-col md:flex-row overflow-hidden animate-fade-in-up">
+        
+        <button onclick="closeDetails()" class="absolute top-4 right-4 z-50 w-10 h-10 flex items-center justify-center rounded-full bg-black/60 hover:bg-white/10 text-white border border-white/10 transition-all">
+            <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+
+        <div class="w-full md:w-5/12 relative bg-slate-900 h-64 md:h-auto">
+            <img id="modal-img" src="" class="absolute inset-0 w-full h-full object-cover opacity-60 transition-opacity duration-700" alt="Event Cover">
+            <div class="absolute inset-0 bg-gradient-to-t from-[#0f0f11] via-[#0f0f11]/40 to-transparent md:bg-gradient-to-r"></div>
+            
+            <div class="absolute bottom-8 left-8 right-8">
+                <span id="modal-status" class="px-2 py-1 rounded bg-emerald-500 text-black text-[10px] font-bold uppercase mb-3 inline-block shadow-lg shadow-emerald-900/50">Active</span>
+                <h2 id="modal-title" class="text-3xl font-bold text-white leading-tight mb-2 font-ui drop-shadow-lg">Event Title</h2>
+                <p id="modal-venue" class="text-sm text-brand-400 font-mono tracking-wide"><i class="fa-solid fa-location-dot mr-1"></i> Venue Name</p>
+            </div>
+        </div>
+
+        <div class="flex-1 p-8 md:p-10 overflow-y-auto custom-scrollbar flex flex-col">
+            <div class="mb-8">
+                <h4 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3 border-l-2 border-brand-500 pl-3">Sinopsis del Evento</h4>
+                <p id="modal-desc" class="text-sm text-slate-300 leading-relaxed font-light">Loading description...</p>
+            </div>
+
+            <div class="flex-1">
+                <h4 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-5 border-b border-white/10 pb-2 flex justify-between items-center">
+                    <span>Telemetría de Ventas</span>
+                    <span class="text-[9px] bg-white/5 px-2 py-1 rounded">LIVE DATA</span>
+                </h4>
+                
+                <div class="space-y-4" id="stats-container">
+                    <div class="text-center py-12">
+                        <i class="fa-solid fa-circle-notch fa-spin text-brand-500 text-3xl mb-4"></i>
+                        <p class="text-xs text-slate-500 font-mono">CALCULANDO OCUPACIÓN...</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-8 pt-6 border-t border-white/10 grid grid-cols-2 gap-6">
+                <div>
+                    <span class="block text-[9px] text-slate-500 uppercase font-bold mb-1">Fecha Programada</span>
+                    <span id="modal-date" class="text-white font-mono text-sm block">--/--/--</span>
+                    <span id="modal-time" class="text-slate-400 font-mono text-xs">--:--</span>
+                </div>
+                <div>
+                    <span class="block text-[9px] text-slate-500 uppercase font-bold mb-1">ID Sistema</span>
+                    <span id="modal-id" class="text-slate-500 font-mono text-[10px] truncate block bg-black/30 p-1 rounded border border-white/5 select-all">...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="modal-edit-event" class="fixed inset-0 bg-black/90 backdrop-blur-md z-[9999] hidden flex items-center justify-center p-4">
+    <div class="bg-[#0a0a0c] border border-white/10 rounded-2xl w-full max-w-xl max-h-[90vh] flex flex-col relative shadow-2xl animate-fade-in-up">
+        
+        <div class="p-6 pb-2 border-b border-white/5 flex justify-between items-start shrink-0">
+            <div>
+                <h2 class="text-xl font-bold text-white mb-1 font-ui">Editar Evento & Precios</h2>
+                <p class="text-[11px] text-slate-500 font-mono uppercase tracking-wider">Gestión integral del espectáculo</p>
+            </div>
+            <button type="button" onclick="closeEditModal()" class="text-slate-500 hover:text-white transition-colors">
+                <i class="fa-solid fa-xmark text-xl"></i>
+            </button>
+        </div>
+
+        <div class="p-6 overflow-y-auto custom-scrollbar grow">
+            
+            <div class="mb-6 bg-slate-900/50 border border-slate-700/50 rounded-xl p-4 relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-1 h-full bg-brand-500"></div>
+                
+                <div class="flex justify-between items-end mb-2 relative z-10">
+                    <div>
+                        <span class="text-[10px] uppercase font-bold text-slate-400 block mb-1">Disponibilidad Actual</span>
+                        <div class="flex items-baseline gap-2">
+                            <span id="stat-available" class="text-2xl font-mono font-bold text-emerald-400">0</span>
+                            <span class="text-xs text-slate-500 font-bold">Sillas Libres</span>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <span id="stat-occupancy" class="text-xs font-bold text-brand-400 bg-brand-500/10 px-2 py-1 rounded border border-brand-500/20">0% Ocupación</span>
+                    </div>
+                </div>
+
+                <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden mt-2">
+                    <div id="stat-progress" class="h-full bg-gradient-to-r from-brand-600 to-brand-400 transition-all duration-1000 ease-out" style="width: 0%"></div>
+                </div>
+                
+                <div class="flex justify-between mt-2 text-[9px] font-mono text-slate-500">
+                    <span>VENDIDAS: <strong id="stat-sold" class="text-slate-300">0</strong></span>
+                    <span>CAPACIDAD: <strong id="stat-total" class="text-slate-300">0</strong></span>
+                </div>
+            </div>
+
+            <form id="edit-event-form" class="space-y-5" enctype="multipart/form-data">
+                <input type="hidden" id="edit-id" name="id"> 
+                
+                <div>
+                    <label class="block text-[9px] uppercase font-bold text-slate-500 mb-1">Nombre del Evento</label>
+                    <input type="text" id="edit-name" name="name" required 
+                           class="w-full bg-[#050505] border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:border-brand-500 outline-none transition-colors">
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-[9px] uppercase font-bold text-slate-500 mb-1">Fecha</label>
+                        <input type="date" id="edit-date" name="date" required 
+                               class="w-full bg-[#050505] border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:border-brand-500 outline-none transition-colors">
+                    </div>
+                    <div>
+                        <label class="block text-[9px] uppercase font-bold text-slate-500 mb-1">Hora</label>
+                        <input type="time" id="edit-time" name="time" required 
+                               class="w-full bg-[#050505] border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:border-brand-500 outline-none transition-colors">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-[9px] uppercase font-bold text-slate-500 mb-1">Descripción</label>
+                    <textarea id="edit-desc" name="description" rows="3" 
+                              class="w-full bg-[#050505] border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:border-brand-500 outline-none transition-colors resize-none"></textarea>
+                </div>
+
+                <div class="pt-4 border-t border-white/5">
+                    <div class="flex items-center justify-between mb-3">
+                        <label class="text-[10px] uppercase font-bold text-brand-400">💲 Lista de Precios (Por Zona)</label>
+                        <span class="text-[9px] text-slate-500 italic">Detectado del mapa del teatro</span>
+                    </div>
+                    
+                    <div class="bg-[#050505] rounded-lg border border-white/10 overflow-hidden">
+                        <table class="w-full text-left border-collapse">
+                            <thead class="bg-white/5">
+                                <tr>
+                                    <th class="py-2 px-3 text-[9px] uppercase font-bold text-slate-400">Zona</th>
+                                    <th class="py-2 px-3 text-[9px] uppercase font-bold text-slate-400 text-right">Precio Unitario (COP)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="pricing-table-body">
+                                <tr><td colspan="2" class="p-4 text-center text-xs text-slate-500"><i class="fa-solid fa-circle-notch fa-spin"></i> Cargando zonas...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4 items-end pt-2">
+                    <div>
+                        <label class="block text-[9px] uppercase font-bold text-slate-500 mb-1">Cambiar Poster</label>
+                        <input type="file" id="edit-poster" name="poster" accept="image/*" 
+                               class="w-full text-[10px] text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-[10px] file:font-bold file:bg-white/10 file:text-white hover:file:bg-brand-600 cursor-pointer">
+                    </div>
+                    
+                    <div class="flex items-center gap-3 bg-white/5 p-2 rounded-lg border border-white/5 h-[38px]">
+                        <input type="checkbox" id="edit-active" name="active" class="w-4 h-4 accent-brand-500 cursor-pointer rounded">
+                        <label for="edit-active" class="text-xs text-white font-bold cursor-pointer select-none">Evento Activo (Público)</label>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <div class="p-6 pt-4 border-t border-white/10 flex justify-end gap-3 bg-[#0a0a0c] rounded-b-2xl shrink-0">
+            <button type="button" onclick="closeEditModal()" class="px-4 py-2 rounded-lg text-xs font-bold text-slate-400 hover:text-white hover:bg-white/5 transition-colors">Cancelar</button>
+            <button type="submit" form="edit-event-form" id="btn-save-edit" class="px-6 py-2 rounded-lg bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold shadow-lg shadow-brand-500/20 transition-all flex items-center gap-2">
+                <i class="fa-solid fa-floppy-disk"></i> Guardar Cambios
+            </button>
+        </div>
+    </div>
+</div>
+
+<div id="toast-container" class="fixed top-20 left-1/2 -translate-x-1/2 flex flex-col gap-3 pointer-events-none z-[9999]"></div>
+
+<script>
+    // --- UTILS: TOAST NOTIFICATIONS ---
+    function showToast(msg, type='success') {
+        const t = document.createElement('div');
+        t.className = `px-5 py-3 rounded-lg backdrop-blur-md shadow-2xl border-l-4 text-xs font-bold flex items-center gap-3 animate-fade-in-up ${type==='error' ? 'bg-black/90 border-red-500 text-white' : 'bg-black/90 border-emerald-500 text-white'}`;
+        t.innerHTML = type==='error' ? `<i class="fa-solid fa-circle-exclamation text-red-500"></i> ${msg}` : `<i class="fa-solid fa-check-circle text-emerald-500"></i> ${msg}`;
+        document.getElementById('toast-container').appendChild(t);
+        setTimeout(() => { t.remove() }, 3000);
+    }
+
+    // --- MODAL DETALLES (TELEMETRIA) ---
+    async function openEventDetails(eventId) {
+        const modal = document.getElementById('modal-details');
+        const container = document.getElementById('stats-container');
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+        
+        container.innerHTML = '<div class="text-center py-12"><i class="fa-solid fa-circle-notch fa-spin text-brand-500 text-3xl mb-4"></i><p class="text-xs text-slate-500 font-mono">CARGANDO DATOS...</p></div>';
+        
+        try {
+            // Ajusta la URL según tu configuración de API en Django
+            const res = await fetch(`/api/v1/functions/${eventId}/`); 
+            if(!res.ok) throw new Error("Error loading API data");
+            const data = await res.json();
+            
+            document.getElementById('modal-title').innerText = data.name;
+            document.getElementById('modal-venue').innerHTML = `<i class="fa-solid fa-location-dot mr-1"></i> ${data.venue_name || 'Ubicación Desconocida'}`;
+            document.getElementById('modal-desc').innerText = data.description || "Sin descripción.";
+            document.getElementById('modal-id').innerText = data.id;
+            
+            const dateObj = new Date(data.date_time);
+            document.getElementById('modal-date').innerText = dateObj.toLocaleDateString();
+            document.getElementById('modal-time').innerText = dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            
+            const img = document.getElementById('modal-img');
+            img.src = data.poster_url || '';
+            
+            renderStats(data.stats, container);
+
+        } catch(e) {
+            console.error(e);
+            container.innerHTML = '<div class="p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-center text-xs">No se pudieron cargar los detalles.</div>';
+        }
+    }
+
+    function renderStats(stats, container) {
+        if (!stats) {
+            container.innerHTML = '<div class="text-center text-slate-500 py-4 text-xs">Sin datos de ventas.</div>';
+            return;
+        }
+        let html = '';
+        for (const [cat, val] of Object.entries(stats)) {
+             const pct = val.total > 0 ? Math.round((val.sold / val.total) * 100) : 0;
+             html += `
+                <div class="mb-3">
+                    <div class="flex justify-between text-xs mb-1">
+                        <span class="font-bold text-slate-300">${cat}</span>
+                        <span class="font-mono text-slate-400">${val.sold} / ${val.total} (${pct}%)</span>
+                    </div>
+                    <div class="w-full h-1 bg-slate-800 rounded-full overflow-hidden">
+                        <div class="h-full bg-brand-500" style="width: ${pct}%"></div>
+                    </div>
+                </div>
+             `;
+        }
+        container.innerHTML = html || '<div class="text-center text-slate-500 py-4 text-xs">Sin ventas registradas.</div>';
+    }
+
+    function closeDetails() {
+        document.getElementById('modal-details').classList.add('hidden');
+        document.body.style.overflow = '';
+    }
+
+    // --- MODAL EDICIÓN + PRECIOS (LOGICA NUEVA) ---
+    async function openEditModal(id) {
+        const modal = document.getElementById('modal-edit-event');
+        const priceTableBody = document.getElementById('pricing-table-body');
+        
+        // Reset Visual
+        document.getElementById('stat-available').innerText = '-';
+        document.getElementById('stat-progress').style.width = '0%';
+        priceTableBody.innerHTML = '<tr><td colspan="2" class="p-4 text-center text-xs text-slate-500"><i class="fa-solid fa-circle-notch fa-spin"></i> Cargando información...</td></tr>';
+        
+        try {
+            // Llamada a la vista Híbrida
+            const res = await fetch(`/dashboard/events/${id}/edit/`);
+            if(!res.ok) throw new Error("Error loading event data");
+            
+            const data = await res.json();
+            
+            // 1. Llenar Campos Básicos
+            document.getElementById('edit-id').value = data.id;
+            document.getElementById('edit-name').value = data.name;
+            document.getElementById('edit-date').value = data.date;
+            document.getElementById('edit-time').value = data.time;
+            document.getElementById('edit-desc').value = data.description;
+            document.getElementById('edit-active').checked = data.active;
+            
+            document.getElementById('edit-poster').value = ''; // Reset input file
+
+            // 2. LLENAR CARD DE AFORO (Top del modal)
+            if (data.stats) {
+                document.getElementById('stat-available').innerText = data.stats.available;
+                document.getElementById('stat-sold').innerText = data.stats.sold;
+                document.getElementById('stat-total').innerText = data.stats.total;
+                document.getElementById('stat-occupancy').innerText = `${data.stats.occupancy}% Ocupación`;
+                
+                setTimeout(() => {
+                    document.getElementById('stat-progress').style.width = `${data.stats.occupancy}%`;
+                }, 100);
+
+                const availEl = document.getElementById('stat-available');
+                if (data.stats.available === 0) {
+                    availEl.className = "text-2xl font-mono font-bold text-red-500"; 
+                    availEl.innerText = "SOLD OUT";
+                } else if (data.stats.available < 20) {
+                    availEl.className = "text-2xl font-mono font-bold text-amber-400";
+                } else {
+                    availEl.className = "text-2xl font-mono font-bold text-emerald-400";
+                }
+            }
+
+            // 3. RENDERIZAR TABLA DE PRECIOS
+            priceTableBody.innerHTML = ''; // Limpiar loader
+            
+            if (data.pricing && data.pricing.length > 0) {
+                data.pricing.forEach(p => {
+                    const row = `
+                        <tr class="border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors">
+                            <td class="px-3 py-2 align-middle">
+                                <span class="badge bg-slate-800 text-white border border-slate-700 px-2 py-0.5 rounded text-[10px] font-bold tracking-wide">${p.zone_name}</span>
+                            </td>
+                            <td class="px-3 py-2">
+                                <div class="relative max-w-[150px] ml-auto">
+                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs">$</span>
+                                    <input type="number" 
+                                           name="prices[${p.zone_code}]" 
+                                           value="${p.current_price > 0 ? p.current_price : ''}" 
+                                           class="w-full bg-[#050505] border border-white/10 rounded px-2 py-1.5 pl-6 text-right text-white text-xs focus:border-brand-500 outline-none transition-all placeholder:text-slate-700" 
+                                           placeholder="0.00"
+                                           min="0" step="1000">
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                    priceTableBody.insertAdjacentHTML('beforeend', row);
+                });
+            } else {
+                priceTableBody.innerHTML = '<tr><td colspan="2" class="p-4 text-center text-xs text-amber-500 border border-amber-500/20 bg-amber-500/5 rounded m-2">⚠️ El mapa de este teatro no tiene zonas definidas o está vacío.</td></tr>';
+            }
+
+            modal.classList.remove('hidden');
+            
+        } catch(e) {
+            showToast("No se pudo cargar la información del evento", "error");
+            console.error(e);
+        }
+    }
+
+    function closeEditModal() {
+        document.getElementById('modal-edit-event').classList.add('hidden');
+    }
+
+    // --- GUARDAR CAMBIOS (AJAX + PRECIOS) ---
+    document.getElementById('edit-event-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const id = document.getElementById('edit-id').value;
+        const btn = document.getElementById('btn-save-edit');
+        const originalText = btn.innerHTML;
+        
+        btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Guardando...';
+        btn.disabled = true;
+
+        // FormData captura automáticamente los inputs CON name="..."
+        const formData = new FormData(this); 
+        
+        // Checkbox fix (los checkboxes de HTML no envían nada si no están marcados)
+        // Sobrescribimos el valor explícitamente
+        formData.set('active', document.getElementById('edit-active').checked);
+
+        try {
+            const res = await fetch(`/dashboard/events/${id}/edit/`, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+                body: formData
+            });
+
+            const result = await res.json();
+
+            if(res.ok) {
+                showToast("Evento y precios actualizados correctamente");
+                closeEditModal();
+                setTimeout(() => window.location.reload(), 800);
+            } else {
+                throw new Error(result.message || "Error al guardar");
+            }
+        } catch(e) {
+            showToast(e.message, "error");
+        } finally {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
+    });
+
+    // Cerrar modales con Escape
+    document.addEventListener('keydown', (e) => {
+        if (e.key === "Escape") {
+            closeDetails();
+            closeEditModal();
+        }
+    });
+</script>
+
+<style>
+    .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
+    
+    .animate-fade-in-up { animation: fadeInUp 0.4s ease-out forwards; }
+    .animate-fade-in-down { animation: fadeInDown 0.5s ease-out forwards; }
+    
+    @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeInDown {
+        from { opacity: 0; transform: translateY(-20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .glass-panel {
+        background: rgba(15, 23, 42, 0.6);
+        backdrop-filter: blur(12px);
+    }
+</style>
+
+{% endblock %}
