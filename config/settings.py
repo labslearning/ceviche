@@ -1,47 +1,72 @@
 """
-⚙️ Configuración Maestra - Ceviche Platform
-Seguridad: Grado Alto (ATP).
-Arquitectura: Django + Railway + PostgreSQL + Redis
+⚙️ Configuración Maestra - Ceviche Platform (GOD-TIER CLOUD EDITION)
+Seguridad: Grado Alto (ATP) - Zero Trust Architecture.
+Infraestructura: Django + Railway + PostgreSQL + Redis + Celery
 """
+import os
 from pathlib import Path
 from decouple import config, Csv
 import dj_database_url
-import os
 
-# Rutas base
+# ==============================================================================
+# 🏗️ RUTAS BASE
+# ==============================================================================
 # BASE_DIR apunta a la carpeta 'backend'
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# 🔐 SEGURIDAD: Leer secretos desde variables de entorno (.env)
+# ==============================================================================
+# 🔐 SEGURIDAD CORE
+# ==============================================================================
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-development-key-change-me')
 
-# En producción (Railway), DEBUG debe ser False.
+# En producción (Railway), DEBUG debe ser explícitamente False.
 DEBUG = config('DEBUG', default=True, cast=bool)
 
-# 🌐 HOSTS PERMITIDOS (¡Actualizado con Ngrok!)
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='127.0.0.1,localhost,.ngrok-free.dev,overkill-disperser-unchain.ngrok-free.dev', cast=Csv())
+# ==============================================================================
+# 🌐 FIREWALL DE DOMINIOS Y CORS (CLOUD NATIVE)
+# ==============================================================================
+# 1. Hosts base locales y de túneles (Ngrok)
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='127.0.0.1,localhost,.ngrok-free.dev', cast=Csv())
+CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', default='http://127.0.0.1,http://localhost,https://*.ngrok-free.dev', cast=Csv())
 
-# 🛡️ Confianza CSRF (¡Actualizado con Ngrok para permitir el POST de Wompi!)
-CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', default='http://127.0.0.1,http://localhost,https://*.ngrok-free.dev,https://overkill-disperser-unchain.ngrok-free.dev', cast=Csv())
+# 2. 🚀 INYECCIÓN DINÁMICA RAILWAY (La magia del Auto-Scaling)
+RAILWAY_DOMAIN = os.environ.get('RAILWAY_PUBLIC_DOMAIN')
+if RAILWAY_DOMAIN:
+    ALLOWED_HOSTS.append(RAILWAY_DOMAIN)
+    ALLOWED_HOSTS.append('.up.railway.app')
+    CSRF_TRUSTED_ORIGINS.append(f'https://{RAILWAY_DOMAIN}')
+    CSRF_TRUSTED_ORIGINS.append('https://*.up.railway.app')
 
-# 📦 APLICACIONES INSTALADAS
+CORS_ALLOW_ALL_ORIGINS = True  # Para consumo de APIs desde cualquier frontend
+
+# 3. 🛡️ REGLAS DE PRODUCCIÓN ESTRICTAS (Solo aplican si DEBUG=False)
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+
+# ==============================================================================
+# 📦 APLICACIONES Y MIDDLEWARES
+# ==============================================================================
 INSTALLED_APPS = [
-    #'jazzmin',
+    # Interfaz Admin Moderna
     "unfold",
+    
+    # Core Django
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.humanize', 
     
     # Third party apps
     'rest_framework', # API Profesional
     'corsheaders',    # Conexión Frontend-Backend
-    # 'django_celery_results', # (Opcional)
 
     # 🏠 Mis Apps (Módulos de Negocio)
-    # 👇 CORRECCIÓN CRÍTICA: Eliminamos 'backend.'
     'apps.common',
     'apps.users',
     'apps.events',
@@ -52,14 +77,13 @@ INSTALLED_APPS = [
     'apps.products',
     'apps.website', 
     'apps.dashboard',
-    'django.contrib.humanize', 
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware', # 🚀 Archivos estáticos rápidos
+    'whitenoise.middleware.WhiteNoiseMiddleware', # 🚀 Estáticos O(1)
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'corsheaders.middleware.CorsMiddleware',      # CORS antes de Common
+    'corsheaders.middleware.CorsMiddleware',      # CORS debe ir antes de Common
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -67,10 +91,12 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-# 👇 CORRECCIÓN CRÍTICA: Eliminamos 'backend.'
 ROOT_URLCONF = 'config.urls'
+WSGI_APPLICATION = 'config.wsgi.application'
 
-# 🎨 CONFIGURACIÓN DE PLANTILLAS (HTML)
+# ==============================================================================
+# 🎨 PLANTILLAS HTML
+# ==============================================================================
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -87,18 +113,23 @@ TEMPLATES = [
     },
 ]
 
-# 👇 CORRECCIÓN CRÍTICA: Eliminamos 'backend.'
-WSGI_APPLICATION = 'config.wsgi.application'
-
-# 🗄️ BASE DE DATOS
+# ==============================================================================
+# 🗄️ BASES DE DATOS (AUTO-PROVISIONING CLOUD)
+# ==============================================================================
 DATABASES = {
     'default': dj_database_url.config(
         default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
-        conn_max_age=600
+        conn_max_age=600,
+        conn_health_checks=True,
     )
 }
 
-# 🔐 VALIDACIÓN DE CONTRASEÑAS
+# ==============================================================================
+# 🔐 VALIDACIÓN DE USUARIOS Y CONTRASEÑAS
+# ==============================================================================
+AUTH_USER_MODEL = 'users.User' 
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
     {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
@@ -106,33 +137,35 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
-# 🌍 IDIOMA Y ZONA HORARIA
+# --- CONFIGURACIÓN DE AUTH (LOGIN/LOGOUT) ---
+LOGIN_URL = '/manager/login/'           
+LOGIN_REDIRECT_URL = '/manager/'        
+LOGOUT_REDIRECT_URL = '/manager/login/'
+
+# ==============================================================================
+# 🌍 LOCALIZACIÓN
+# ==============================================================================
 LANGUAGE_CODE = 'es-co' # Colombia
 TIME_ZONE = 'America/Bogota'
 USE_I18N = True
 USE_TZ = True
 
-# 📂 ARCHIVOS ESTÁTICOS (CSS, JS, IMAGES)
+# ==============================================================================
+# 📂 ARCHIVOS ESTÁTICOS Y MEDIA (WHITENOISE OPTIMIZED)
+# ==============================================================================
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATICFILES_DIRS = [BASE_DIR / 'static']
 
-STATICFILES_DIRS = [
-    BASE_DIR / 'static',
-]
-
-# Compresión y caché para alto rendimiento en producción
-#STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+# Modo Permisivo: Ignora referencias rotas en CSS sin crashear el servidor
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
-# 👤 USUARIO PERSONALIZADO
-# IMPORTANTE: Asegúrate de que tu modelo User esté en apps.users
-AUTH_USER_MODEL = 'users.User' 
 
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
-# 🛡️ CORS (Seguridad de API)
-CORS_ALLOW_ALL_ORIGINS = True 
-
-# ⚡ CONFIGURACIÓN DRF (DJANGO REST FRAMEWORK)
+# ==============================================================================
+# ⚡ DJANGO REST FRAMEWORK (API)
+# ==============================================================================
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework.authentication.SessionAuthentication',
@@ -151,13 +184,23 @@ REST_FRAMEWORK = {
     }
 }
 
-# 🐇 CELERY & REDIS
-CELERY_BROKER_URL = config('REDIS_URL', default='redis://localhost:6379/0')
-CELERY_RESULT_BACKEND = config('REDIS_URL', default='redis://localhost:6379/0')
-CELERY_ACCEPT_CONTENT = ['json']
-CELERY_TASK_SERIALIZER = 'json'
+# ==============================================================================
+# 🚀 CELERY & REDIS: COLAS DE ALTO RENDIMIENTO (CORREGIDO PARA CLOUD)
+# ==============================================================================
+# Toma la URL inyectada por Railway, o usa localhost como fallback seguro.
+CELERY_BROKER_URL = config('REDIS_URL', default='redis://127.0.0.1:6379/0')
+CELERY_RESULT_BACKEND = config('REDIS_URL', default='redis://127.0.0.1:6379/0')
 
+CELERY_ACCEPT_CONTENT = ['application/json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = 1800 # 30 Minutos de seguridad
+CELERY_WORKER_CONCURRENCY = 4
+
+# ==============================================================================
 # 📜 LOGGING PROFESIONAL
+# ==============================================================================
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -172,13 +215,16 @@ LOGGING = {
     },
 }
 
+# ==============================================================================
+# 💄 CONFIGURACIÓN ADMIN (JAZZMIN/UNFOLD FALLBACK)
+# ==============================================================================
 JAZZMIN_SETTINGS = {
     "site_title": "Ceviche Studios Admin",
     "site_header": "Ceviche Studios",
     "site_brand": "Ceviche Admin",
     "welcome_sign": "Bienvenido al Panel de Control de Ceviche Studios",
     "copyright": "Ceviche Studios Ltd",
-    "search_model": ["users.User", "products.Product"], # Ajustado a 'users'
+    "search_model": ["users.User", "products.Product"], 
     "topmenu_links": [
         {"name": "Inicio", "url": "admin:index", "permissions": ["auth.view_user"]},
         {"name": "Ver Sitio Web", "url": "/", "new_window": True},
@@ -187,29 +233,9 @@ JAZZMIN_SETTINGS = {
     "navigation_expanded": True,
     "icons": {
         "auth": "fas fa-users-cog",
-        "users.User": "fas fa-user", # Ajustado a 'users'
+        "users.User": "fas fa-user", 
         "products.Product": "fas fa-hamburger",
         "events.Event": "fas fa-ticket-alt",
         "orders.Order": "fas fa-shopping-cart",
     },
 }
-
-# --- CONFIGURACIÓN DE AUTH (LOGIN/LOGOUT) ---
-LOGIN_URL = '/manager/login/'           
-LOGIN_REDIRECT_URL = '/manager/'        
-LOGOUT_REDIRECT_URL = '/manager/login/'
-
-# 👇 AGREGA ESTAS DOS LÍNEAS PARA EVITAR EL ERROR 404 "CATCH-ALL"
-MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
-# ==============================================================================
-# 🚀 CELERY & REDIS: CONFIGURACIÓN DE COLAS DE ALTO RENDIMIENTO
-# ==============================================================================
-CELERY_BROKER_URL = 'redis://127.0.0.1:6379/0'
-CELERY_RESULT_BACKEND = 'redis://127.0.0.1:6379/0'
-CELERY_ACCEPT_CONTENT = ['application/json']
-CELERY_TASK_SERIALIZER = 'json'
-CELERY_RESULT_SERIALIZER = 'json'
-CELERY_TASK_TRACK_STARTED = True
-CELERY_TASK_TIME_LIMIT = 30 * 60
-CELERY_WORKER_CONCURRENCY = 4
