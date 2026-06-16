@@ -121,8 +121,8 @@ STATICFILES_DIRS = [
 ]
 
 # Compresión y caché para alto rendimiento en producción
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
-
+#STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
 # 👤 USUARIO PERSONALIZADO
 # IMPORTANTE: Asegúrate de que tu modelo User esté en apps.users
 AUTH_USER_MODEL = 'users.User' 
