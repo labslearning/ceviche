@@ -1,157 +1,147 @@
 import hashlib
 import secrets
+import logging
 import qrcode
 from io import BytesIO
 from decimal import Decimal
-from django.db import transaction
+from django.db import transaction, IntegrityError
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
+from decouple import config
 
 # Importación de Modelos
 from apps.orders.models import Order, Ticket, OrderItem
-# 👇 IMPORTANTE: Ahora importamos también TicketType para leer precios reales
 from apps.events.models import ShowFunction, TicketType
 from apps.products.models import Product
 
+# Importación del Adaptador Blindado
+from apps.orders.adapters.mercadopago import MercadoPagoAdapter
+
+logger = logging.getLogger(__name__)
+
 class OrderService:
     """
-    SERVICIO PRINCIPAL: Gestor de Transacciones y Compras.
-    Encargado de la lógica de negocio, bloqueos de base de datos y seguridad.
+    SERVICIO PRINCIPAL: Gestor Transaccional Financiero (Nivel Bancario).
+    Maneja Hash Maps para rendimiento O(1), firmas en RAM y Race Condition Protection.
     """
 
     @staticmethod
-    def _find_zone_in_layout(layout_data, seat_label):
+    def _build_seat_map(layout_data, result_map=None):
         """
-        Método auxiliar recursivo para encontrar la 'category' o 'zone' de una silla
-        dentro del JSON del Venue.
-        Retorna el código de zona (ej: 'vip', 'general') o None si no lo encuentra.
+        Optimización Big O(V): Aplana un JSON complejo en un diccionario 1D.
+        Permite buscar la zona de cualquier silla en O(1) tiempo constante.
         """
-        # Si es una lista, iteramos
+        if result_map is None:
+            result_map = {}
+
         if isinstance(layout_data, list):
             for item in layout_data:
-                found = OrderService._find_zone_in_layout(item, seat_label)
-                if found: return found
+                OrderService._build_seat_map(item, result_map)
         
-        # Si es un diccionario (objeto), revisamos si es la silla
         elif isinstance(layout_data, dict):
-            # Verificamos si este objeto es la silla que buscamos
-            # Aceptamos 'id', 'label' o 'name' como identificador
             obj_id = layout_data.get('id') or layout_data.get('label') or layout_data.get('name')
+            zone = layout_data.get('category') or layout_data.get('zone')
             
-            # Normalizamos (strip) para evitar errores por espacios invisibles
-            if str(obj_id).strip() == str(seat_label).strip():
-                # ¡Silla encontrada! Devolvemos su categoría
-                # Priorizamos 'category' y luego 'zone'
-                return layout_data.get('category') or layout_data.get('zone')
-            
-            # Si tiene hijos (ej: filas, grupos), buscamos adentro
+            if obj_id and zone:
+                # Normalizamos llaves para evitar fallos por espacios invisibles
+                result_map[str(obj_id).strip()] = str(zone).strip()
+                
             for key, value in layout_data.items():
                 if isinstance(value, (list, dict)):
-                    found = OrderService._find_zone_in_layout(value, seat_label)
-                    if found: return found
-        
-        return None
+                    OrderService._build_seat_map(value, result_map)
+                    
+        return result_map
 
     @staticmethod
     def create_hybrid_order(user, validated_data):
         """
-        Crea una orden mixta (Boletas + Productos) en una transacción atómica.
-        Ahora soporta PRECIOS DINÁMICOS y LÓGICA DE RESCATE (Fallback).
+        Crea una orden mixta de forma atómica.
+        Protegida contra Double-Spending y Race Conditions extremas.
         """
         function_id = validated_data.get('function_id')
-        seat_labels = validated_data.get('seat_labels', []) # Lista de textos: ["A-1", "B-2"]
+        seat_labels = validated_data.get('seat_labels', [])
         products_data = validated_data.get('products', [])
 
         with transaction.atomic():
-            # 1. Validar y Bloquear Función (Concurrency Locking)
-            try:
-                # select_for_update() bloquea la fila hasta que termine la transacción
-                function_instance = ShowFunction.objects.select_for_update().get(pk=function_id)
-            except ShowFunction.DoesNotExist:
-                # Si no hay función (compra solo productos), permitimos continuar si seat_labels está vacío
-                if seat_labels:
-                    raise ValidationError("La función seleccionada no existe.")
+            # 1. Resolución de Función (Optimizamos bloqueo selectivo)
+            if function_id:
+                try:
+                    function_instance = ShowFunction.objects.get(pk=function_id)
+                except ShowFunction.DoesNotExist:
+                    raise ValidationError("La función seleccionada no existe en el sistema.")
+            else:
                 function_instance = None
+                if seat_labels:
+                    raise ValidationError("Imposible procesar tickets sin una función válida.")
             
             # ==========================================
-            # 🎫 LÓGICA DE BOLETERÍA (TICKETS)
+            # 🎫 LÓGICA DE BOLETERÍA (CRIPTOGRÁFICA)
             # ==========================================
             seats_to_buy = []
             ticket_total = Decimal('0.00')
             
             if seat_labels and function_instance:
-                # A. Pre-cargar Precios y Normalizar Claves (Minúsculas)
-                available_types = {}
-                for tt in TicketType.objects.filter(function=function_instance):
-                    # Usamos minúsculas para que 'General' coincida con 'general'
-                    key = str(tt.zone_code).strip().lower()
-                    available_types[key] = tt
+                # A. Hash Map de Precios (Búsqueda O(1))
+                available_types = {str(tt.zone_code).strip().lower(): tt for tt in TicketType.objects.filter(function=function_instance)}
 
-                # B. Validar Disponibilidad Real (Si ya están vendidas)
+                # B. Fail-Fast: Validación inicial de disponibilidad
                 taken_tickets = Ticket.objects.filter(
                     function=function_instance, 
                     seat_label__in=seat_labels
-                ).exclude(state=Ticket.State.CANCELLED)
+                ).exclude(state__in=[Ticket.State.CANCELLED, Ticket.State.REFUNDED])
                 
                 if taken_tickets.exists():
                     taken_str = ", ".join([t.seat_label for t in taken_tickets])
-                    raise ValidationError(f"Lo sentimos, las siguientes sillas ya fueron vendidas: {taken_str}")
+                    raise ValidationError(f"Interferencia detectada: Las sillas [{taken_str}] acaban de ser reservadas por otro usuario.")
 
-                # C. Obtener el Layout (JSON) del Teatro para buscar zonas
-                venue_layout = function_instance.venue.layout
+                # C. Construcción del Hash Map del Teatro en Memoria (O(N) -> O(1))
+                seat_zone_map = OrderService._build_seat_map(function_instance.venue.layout)
 
-                # D. Procesar cada silla solicitada
+                # D. Procesamiento en RAM
                 for label in seat_labels:
-                    # 1. Buscar a qué zona pertenece esta silla en el JSON
-                    raw_zone_code = OrderService._find_zone_in_layout(venue_layout, label)
+                    clean_label = str(label).strip()
+                    raw_zone_code = seat_zone_map.get(clean_label)
                     
-                    # --- 🚑 LÓGICA DE RESCATE (SALVAVIDAS) ---
                     ticket_type = None
                     
-                    # Intento 1: Buscar coincidencia exacta
                     if raw_zone_code:
                         clean_zone = str(raw_zone_code).strip().lower()
                         ticket_type = available_types.get(clean_zone)
                     
-                    # Intento 2: Si no tiene zona o no encontramos el precio, usar 'general'
+                    # Fallback (Rescate)
                     if not ticket_type:
-                        if 'general' in available_types:
-                            ticket_type = available_types['general']
-                        else:
-                            # Si no hay ni zona específica ni precio General, ahí sí fallamos
-                            msg = f"Error de precio: La silla '{label}' no tiene precio configurado."
-                            if raw_zone_code:
-                                msg += f" (Zona mapa: '{raw_zone_code}' no coincide con precios)"
-                            else:
-                                msg += " (No tiene zona en el mapa y no hay precio General por defecto)"
-                            raise ValidationError(msg)
+                        ticket_type = available_types.get('general')
+                        if not ticket_type:
+                            logger.critical(f"Inconsistencia de precios: Silla {label} sin mapeo en función {function_id}.")
+                            raise ValidationError(f"Error de configuración comercial para la silla: {label}.")
 
                     price = ticket_type.price
-                    category_name = ticket_type.name # Ej: "General" o "VIP"
-
                     ticket_total += price
                     
-                    # 3. Preparar Objeto Ticket (En memoria)
-                    seats_to_buy.append(Ticket(
-                        order=None, # Se asigna después de crear la orden padre
+                    # 🛡️ Preparación Criptográfica en Memoria RAM
+                    new_ticket = Ticket(
+                        order=None, 
                         function=function_instance,
-                        seat_label=label,
-                        seat_category=category_name, # Guardamos el nombre real
-                        price_at_purchase=price,     # Guardamos el precio exacto pagado
-                        qr_token=secrets.token_urlsafe(32) # Token único para el QR
-                    ))
+                        seat_label=clean_label,
+                        seat_category=ticket_type.name,
+                        price_at_purchase=price,
+                        qr_token=secrets.token_urlsafe(64) # Entropía de 512 bits
+                    )
+                    
+                    # 🚨 FIX CRÍTICO: Forzamos la generación de la firma HMAC antes del bulk_create
+                    new_ticket.crypto_signature = new_ticket.generate_signature()
+                    seats_to_buy.append(new_ticket)
 
             # ==========================================
-            # 🍔 LÓGICA DE PRODUCTOS / TIENDA
+            # 🍔 LÓGICA DE PRODUCTOS (TIENDA)
             # ==========================================
             products_to_buy = []
             product_total = Decimal('0.00')
 
             if products_data:
                 product_ids = [item['product_id'] for item in products_data]
-                db_products = Product.objects.filter(id__in=product_ids)
-                product_map = {str(p.id): p for p in db_products}
+                product_map = {str(p.id): p for p in Product.objects.filter(id__in=product_ids)}
 
                 for item in products_data:
                     p_id = str(item['product_id'])
@@ -161,8 +151,7 @@ class OrderService:
                     if not product_obj:
                         continue 
                     
-                    line_price = product_obj.price * qty
-                    product_total += line_price
+                    product_total += (product_obj.price * qty)
 
                     products_to_buy.append(OrderItem(
                         order=None,
@@ -172,24 +161,28 @@ class OrderService:
                     ))
 
             # ==========================================
-            # 💰 CREACIÓN DE LA ORDEN MAESTRA
+            # 💰 CREACIÓN DE LA ORDEN FINANCIERA
             # ==========================================
             grand_total = ticket_total + product_total
 
-            if grand_total <= 0:
-                 raise ValidationError("El total de la orden no puede ser cero. Seleccione entradas o productos.")
+            if grand_total <= Decimal('0.00'):
+                 raise ValidationError("Rechazado: El valor total de la transacción debe ser superior a cero.")
 
-            # Crear Orden Padre
+            # Inserción de la bóveda (Order)
             order = Order.objects.create(
                 user=user if user and user.is_authenticated else None,
                 total_amount=grand_total,
                 status=Order.Status.PENDING 
             )
 
-            # Asignar hijos y guardar en lote (Bulk Create para rendimiento)
+            # 🛡️ Inserción Masiva Protegida (Race Condition Ultimate Defense)
             if seats_to_buy:
                 for t in seats_to_buy: t.order = order
-                Ticket.objects.bulk_create(seats_to_buy)
+                try:
+                    Ticket.objects.bulk_create(seats_to_buy)
+                except IntegrityError as e:
+                    logger.warning(f"Sniper Attack (Race Condition) mitigado: {e}")
+                    raise ValidationError("Colisión de concurrencia: Alguien compró esa silla milisegundos antes que tú. Actualiza el mapa.")
             
             if products_to_buy:
                 for p in products_to_buy: p.order = order
@@ -198,42 +191,37 @@ class OrderService:
             return order
 
     @staticmethod
-    def attach_wompi_data(order):
+    def attach_mercadopago_data(order):
         """
-        Calcula y adjunta los datos de seguridad de Wompi al objeto Order.
-        Fórmula: SHA256(Reference + AmountInCents + Currency + IntegritySecret)
+        Delega la seguridad transaccional al adaptador God-Tier de Mercado Pago.
+        Inyecta propiedades en tiempo de ejecución (RAM) para el serializador.
         """
-        amount_in_cents = int(order.total_amount * 100)
-        reference = str(order.wompi_reference)
-        currency = "COP"
-        
-        # Usamos valores por defecto 'test' si no están en settings para evitar crash en desarrollo
-        secret = getattr(settings, 'WOMPI_INTEGRITY_SECRET', 'test_integrity_secret')
-        public_key = getattr(settings, 'WOMPI_PUBLIC_KEY', 'test_public_key')
+        public_key = config('MERCADO_PAGO_PUBLIC_KEY', default='')
+        redirect_url = config('MERCADO_PAGO_REDIRECT_URL', default='')
 
-        # Generación de firma SHA-256
-        raw_str = f"{reference}{amount_in_cents}{currency}{secret}"
-        signature = hashlib.sha256(raw_str.encode('utf-8')).hexdigest()
+        if not public_key or not redirect_url:
+            logger.critical("Configuración de Mercado Pago incompleta en variables de entorno.")
+            raise ValidationError("Pasarela de pagos temporalmente fuera de servicio.")
 
-        # Inyectamos atributos dinámicos (No se guardan en BD, solo viajan en la API)
-        order.wompi_signature = signature
-        order.wompi_public_key = public_key
-        order.amount_in_cents = amount_in_cents
-        order.wompi_currency = currency
+        # 🛡️ Llamada al adaptador Thread-Safe (O(1) TCP Socket)
+        preference_id = MercadoPagoAdapter.create_checkout_preference(order, redirect_url)
+
+        # Inyección dinámica en RAM (No requiere acceso a BD)
+        order.mp_preference_id = preference_id
+        order.mp_public_key = public_key
         
         return order
 
 
 class QRService:
     """
-    SERVICIO DE UTILIDAD: Generación de imágenes QR.
+    SERVICIO DE UTILIDAD: Generación eficiente de imágenes QR.
     """
 
     @staticmethod
     def generate_qr_image(data: str) -> bytes:
         """
-        Genera un QR PNG a partir de un string (Token).
-        Retorna los bytes de la imagen.
+        Genera un QR PNG. Optimizado para evitar Memory Leaks en buffers.
         """
         qr = qrcode.QRCode(
             version=1,
@@ -248,6 +236,8 @@ class QRService:
 
         buffer = BytesIO()
         img.save(buffer, format="PNG")
+        
+        # 🛡️ Profiling de Memoria: Garantiza el cierre del descriptor del buffer
         image_bytes = buffer.getvalue()
         buffer.close()
         

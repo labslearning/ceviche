@@ -18,11 +18,11 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-development-key-chang
 # En producción (Railway), DEBUG debe ser False.
 DEBUG = config('DEBUG', default=True, cast=bool)
 
-# Hosts permitidos
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='127.0.0.1,localhost', cast=Csv())
+# 🌐 HOSTS PERMITIDOS (¡Actualizado con Ngrok!)
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='127.0.0.1,localhost,.ngrok-free.dev,overkill-disperser-unchain.ngrok-free.dev', cast=Csv())
 
-# Confianza CSRF (Vital para Railway y formularios seguros)
-CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', default='http://127.0.0.1,http://localhost', cast=Csv())
+# 🛡️ Confianza CSRF (¡Actualizado con Ngrok para permitir el POST de Wompi!)
+CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', default='http://127.0.0.1,http://localhost,https://*.ngrok-free.dev,https://overkill-disperser-unchain.ngrok-free.dev', cast=Csv())
 
 # 📦 APLICACIONES INSTALADAS
 INSTALLED_APPS = [
@@ -194,16 +194,22 @@ JAZZMIN_SETTINGS = {
     },
 }
 
-
 # --- CONFIGURACIÓN DE AUTH (LOGIN/LOGOUT) ---
 LOGIN_URL = '/manager/login/'           
 LOGIN_REDIRECT_URL = '/manager/'        
 LOGOUT_REDIRECT_URL = '/manager/login/'
 
-
-# ... configuración de STATIC_URL ...
-
 # 👇 AGREGA ESTAS DOS LÍNEAS PARA EVITAR EL ERROR 404 "CATCH-ALL"
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
-
+# ==============================================================================
+# 🚀 CELERY & REDIS: CONFIGURACIÓN DE COLAS DE ALTO RENDIMIENTO
+# ==============================================================================
+CELERY_BROKER_URL = 'redis://127.0.0.1:6379/0'
+CELERY_RESULT_BACKEND = 'redis://127.0.0.1:6379/0'
+CELERY_ACCEPT_CONTENT = ['application/json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = 30 * 60
+CELERY_WORKER_CONCURRENCY = 4

@@ -1,0 +1,101 @@
+version: '3.8'
+
+# 🛡️ 1. RED EXPLÍCITA: El puente que permite a Podman traducir "db" y "redis" a IPs
+networks:
+  ceviche_net:
+    driver: bridge
+
+services:
+  db:
+    image: postgres:14-alpine
+    container_name: db
+    networks:
+      - ceviche_net
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=ceviche_db
+      - POSTGRES_USER=ceviche_admin
+      - POSTGRES_PASSWORD=super_secreto_db_123
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ceviche_admin -d ceviche_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    networks:
+      - ceviche_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  web:
+    build: .
+    container_name: web
+    networks:
+      - ceviche_net
+    # 🛡️ 2. FORZAR EL SCRIPT: Esto evita que el contenedor muera o se quede en blanco
+    entrypoint: ["/bin/bash", "/app/entrypoint.sh"]
+    volumes:
+      - ./entrypoint.sh:/app/entrypoint.sh
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgres://ceviche_admin:super_secreto_db_123@db:5432/ceviche_db
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - DJANGO_SETTINGS_MODULE=config.settings
+    # 🛡️ 3. ORDEN DE ARRANQUE: Django no despierta hasta que Postgres y Redis pasen su test médico
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  celery_worker:
+    build: .
+    container_name: celery_worker
+    networks:
+      - ceviche_net
+    command: celery -A config worker --loglevel=info --queues=financial_deliveries
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgres://ceviche_admin:super_secreto_db_123@db:5432/ceviche_db
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - DJANGO_SETTINGS_MODULE=config.settings
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    networks:
+      - ceviche_net
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+    depends_on:
+      - web
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  static_volume:
+  media_volume:
