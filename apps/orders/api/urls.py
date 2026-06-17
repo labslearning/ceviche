@@ -9,8 +9,14 @@ from rest_framework.routers import DefaultRouter
 from .views import OrderViewSet, TicketViewSet
 
 # 2. Importamos la nueva Bóveda Transaccional God-Tier (Mercado Pago)
-from .api.mercadopago import CheckoutMercadoPagoAPIView
-from .webhooks.mercadopago_ipn import MercadoPagoWebhookAPIView
+#from .api.mercadopago import CheckoutMercadoPagoAPIView
+#from .webhooks.mercadopago_ipn import MercadoPagoWebhookAPIView
+
+# ✅ CORRECTO: Apuntamos directamente al archivo en la misma carpeta 'api'
+from .mercadopago import CheckoutMercadoPagoAPIView
+
+# ✅ CORRECTO: Subimos un nivel (..) para salir de 'api' y entrar a 'webhooks'
+from ..webhooks.mercadopago_ipn import MercadoPagoWebhookAPIView
 
 # ==========================================
 # 🔄 ENRUTADOR AUTOMÁTICO (API GATEWAY LOCAL)
