@@ -239,3 +239,9 @@ JAZZMIN_SETTINGS = {
         "orders.Order": "fas fa-shopping-cart",
     },
 }
+
+# ==============================================================================
+# 💳 MERCADO PAGO INTEGRATION
+# ==============================================================================
+MERCADO_PAGO_ACCESS_TOKEN = config('MERCADO_PAGO_ACCESS_TOKEN', default='')
+MERCADO_PAGO_PUBLIC_KEY = config('MERCADO_PAGO_PUBLIC_KEY', default='')
