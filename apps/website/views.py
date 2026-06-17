@@ -33,10 +33,21 @@ class HomeView(TemplateView):
 
 
 def events_list(request):
-    now = timezone.now()
+    """
+    Vista pública optimizada. 
+    Filtra eventos activos desde el inicio del día actual (00:00:00) 
+    para asegurar que los eventos de 'hoy' siempre aparezcan.
+    """
+    # Obtenemos la fecha de hoy, ajustada a las 00:00:00 locales
+    today_start = timezone.localtime(timezone.now()).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+    
+    # Filtramos desde el inicio del día. 
+    # Esto garantiza que el evento del 9 de junio (o cualquiera de hoy) aparezca.
     events = ShowFunction.objects.filter(
         active=True, 
-        date_time__gte=now
+        date_time__gte=today_start
     ).select_related('venue').order_by('date_time')
 
     return render(request, 'website/events_public_list.html', {
