@@ -1,3 +1,4 @@
+# apps/dashboard/urls.py
 from django.urls import path
 from django.contrib.auth.views import LogoutView
 from .views import (
@@ -6,43 +7,46 @@ from .views import (
     OrderListView,
     ShowFunctionListView,
     DashboardLoginView,
-    ShowFunctionUpdateView
+    ShowFunctionUpdateView,
+    ShowFunctionCreateView  # 👈 Añadido: Importación del motor de creación atómica
 )
 
 # 🔑 Namespace para las URLs (ej: {% url 'dashboard:home' %})
 app_name = 'dashboard'
 
 urlpatterns = [
-    # 🏠 RUTA RAÍZ: /dashboard/
+    # ==========================================
+    # 🏠 RUTAS DE NÚCLEO Y AUTENTICACIÓN
+    # ==========================================
     path('', DashboardHomeView.as_view(), name='home'),
-
-    # 🚨 RUTA EXPLÍCITA (Para evitar el error 404 si alguien escribe /home/)
     path('home/', DashboardHomeView.as_view(), name='home_explicit'),
     
-    # 🔑 Autenticación
     path('login/', DashboardLoginView.as_view(), name='login'),
     path('logout/', LogoutView.as_view(next_page='dashboard:login'), name='logout'),
     
+    # ==========================================
     # 🎭 EDITOR DE TEATROS (VENUES)
-    
-    # 1. Ruta GENÉRICA (Sin ID): Para crear o cargar por defecto
-    # URL: /dashboard/theater/editor/
+    # ==========================================
+    # 1. Ruta GENÉRICA: Para crear o cargar el mapa por defecto
     path('theater/editor/', VenueEditorView.as_view(), name='theater_editor'),
     
-    # 2. Ruta ESPECÍFICA (Con ID UUID): Para editar un teatro puntual
-    # URL: /dashboard/theater/editor/da21a06a-9eda.../
-    # CAMBIOS: 
-    # - 'venue' -> 'theater' (Para coincidir con el navegador)
-    # - <int:venue_id> -> <uuid:venue_id> (Para coincidir con tu modelo)
-    # - Orden cambiado a 'editor/<id>/' para coincidir con tu Javascript
+    # 2. Ruta ESPECÍFICA: Para editar un teatro puntual según su UUID
     path('theater/editor/<uuid:venue_id>/', VenueEditorView.as_view(), name='theater_editor_id'),
     
-    # 🛒 Finanzas y Órdenes
+    # ==========================================
+    # 🛒 FINANZAS Y ÓRDENES
+    # ==========================================
     path('orders/', OrderListView.as_view(), name='order_list'),
     
-    # 🎫 Lista de Funciones (Eventos)
+    # ==========================================
+    # 🎫 GESTIÓN DE ESPECTÁCULOS (EVENTOS)
+    # ==========================================
+    # 1. Listado principal
     path('events/', ShowFunctionListView.as_view(), name='event_list'),
-
-    path('events/<uuid:pk>/edit/', ShowFunctionUpdateView.as_view(), name='event_edit'),
+    
+    # 2. MOTOR DE CREACIÓN (El eslabón que faltaba)
+    path('events/create/', ShowFunctionCreateView.as_view(), name='event_create'),
+    
+    # 3. MOTOR DE EDICIÓN Y PRECIOS (Corregido, se eliminó el duplicado)
     path('events/<uuid:pk>/edit/', ShowFunctionUpdateView.as_view(), name='event_edit'),
 ]
