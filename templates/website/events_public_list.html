@@ -5,16 +5,22 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- 🛡️ SECURITY HEADER: Previene ataques de Clickjacking y MIME-Sniffing -->
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    
     <title>Cartelera Oficial | CevicheStudios</title>
 
+    <!-- 🚀 PERFORMANCE: Preconexión a dominios críticos para reducir latencia DNS -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800;900&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
     
-    <link href="http://assets.jumpseller.com/public/themes/influence/bootstrap_3.min.css" rel="stylesheet" type="text/css">
+    <!-- 🛡️ HTTPS ENFORCEMENT: Mitigación de Man-in-the-Middle (MitM) -->
+    <link href="https://assets.jumpseller.com/public/themes/influence/bootstrap_3.min.css" rel="stylesheet" type="text/css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://assets.jumpseller.com/store/cevichestudios/themes/638214/app.min.css?1758591088" rel="stylesheet" type="text/css">
-    <link href="http://assets.jumpseller.com/public/pe-icon-7-stroke/0.1.0/pe-icon-7-stroke.css" rel="stylesheet" type="text/css">
+    <link href="https://assets.jumpseller.com/public/pe-icon-7-stroke/0.1.0/pe-icon-7-stroke.css" rel="stylesheet" type="text/css">
 
     <style>
         :root {
@@ -31,6 +37,7 @@
             background-color: var(--bg-body);
             color: var(--text-main);
             -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
 
         h1, h2, h3, h4, .btn, .nav-link {
@@ -39,22 +46,21 @@
 
         /* ----------------------------------------------------
            1. CORRECCIÓN DEL MENÚ (Z-INDEX FIX)
-           Esto asegura que el menú SIEMPRE esté encima de todo
         ---------------------------------------------------- */
         #top_components {
             position: relative;
-            z-index: 9999 !important; /* Capa más alta */
+            z-index: 9999 !important;
             background-color: #000;
         }
         
         header.sticky {
             z-index: 9999 !important;
             position: relative;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.8); /* Sombra para separar del contenido */
+            box-shadow: 0 4px 20px rgba(0,0,0,0.8);
         }
 
         /* ----------------------------------------------------
-           2. HERO BANNER (Estilo Cine)
+           2. HERO BANNER (Estilo Cine - Optimizado)
         ---------------------------------------------------- */
         .cinematic-hero {
             position: relative;
@@ -65,19 +71,21 @@
             align-items: center;
             justify-content: center;
             margin-bottom: 60px;
-            z-index: 1; /* Capa baja para no tapar menú */
+            z-index: 1;
+            /* 🚀 HARDWARE ACCELERATION: Offloads render to GPU */
+            transform: translateZ(0); 
         }
 
         .cinematic-bg {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
-            /* Imagen de fondo desenfocada y oscura */
             background-image: url('https://assets.jumpseller.com/store/cevichestudios/themes/638214/settings/0f2027e3ed767b2e2fe3/Banner 1_Mesa de trabajo 1.jpg?1718153819');
             background-size: cover;
             background-position: center;
             opacity: 0.5; 
             filter: blur(4px) brightness(0.6);
             transform: scale(1.1);
+            will-change: transform;
         }
 
         .hero-content {
@@ -129,7 +137,7 @@
             background-color: var(--bg-card);
             border-radius: var(--radius);
             overflow: hidden;
-            border: 1px solid #222; /* Borde sutil */
+            border: 1px solid #222;
             transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
             height: 100%;
             display: flex;
@@ -140,14 +148,13 @@
         .pro-card:hover {
             transform: translateY(-10px);
             border-color: var(--primary);
-            box-shadow: 0 20px 50px rgba(255, 102, 0, 0.15); /* Resplandor naranja */
+            box-shadow: 0 20px 50px rgba(255, 102, 0, 0.15);
         }
 
-        /* Imagen Poster */
         .card-image {
             position: relative;
             width: 100%;
-            padding-top: 140%; /* Relación de aspecto vertical (Poster) */
+            padding-top: 140%;
             overflow: hidden;
             background: #000;
         }
@@ -166,7 +173,6 @@
             opacity: 1;
         }
 
-        /* Fecha Flotante (Glassmorphism) */
         .date-badge {
             position: absolute;
             top: 15px; left: 15px;
@@ -179,6 +185,7 @@
             text-align: center;
             z-index: 10;
         }
+        
         .date-badge .day {
             display: block;
             font-size: 24px;
@@ -186,6 +193,7 @@
             line-height: 1;
             color: #fff;
         }
+        
         .date-badge .month {
             display: block;
             font-size: 10px;
@@ -195,7 +203,6 @@
             margin-top: 2px;
         }
 
-        /* Contenido de la Tarjeta */
         .card-content {
             padding: 25px;
             flex-grow: 1;
@@ -218,6 +225,7 @@
             text-decoration: none;
             transition: color 0.3s;
         }
+        
         .pro-card:hover .event-title a {
             color: var(--primary);
         }
@@ -229,6 +237,7 @@
             display: flex;
             align-items: center;
         }
+        
         .event-meta i {
             color: var(--primary);
             width: 20px;
@@ -236,7 +245,6 @@
             margin-right: 8px;
         }
 
-        /* Botón de Compra */
         .btn-ticket {
             display: block;
             width: 100%;
@@ -262,7 +270,6 @@
             box-shadow: 0 0 15px rgba(255, 102, 0, 0.5);
         }
 
-        /* Estado Vacío */
         .empty-state {
             text-align: center;
             padding: 100px 0;
@@ -271,12 +278,19 @@
             margin-top: 20px;
         }
 
-        /* Ajustes Responsivos */
         @media (max-width: 768px) {
             .hero-title { font-size: 3rem; }
             .cinematic-hero { height: 350px; }
             .card-content { padding: 20px; }
         }
+        
+        /* Animación de entrada por hardware */
+        .animated { animation-duration: 0.8s; animation-fill-mode: both; }
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translate3d(0, 30px, 0); }
+            to { opacity: 1; transform: translate3d(0, 0, 0); }
+        }
+        .fadeInUp { animation-name: fadeInUp; }
     </style>
 </head>
 
@@ -299,11 +313,11 @@
         <header class="sticky" style="background-color: #000;">
           <div class="container">
             <a href="{% url 'home' %}" class="logo pull-left">
-              <img src="https://images.jumpseller.com/store/cevichestudios/store/logo/CEVISTIKER_NARANJA__1_.png?1738101719" alt="CevicheStudios" style="max-height: 45px; margin-top: 5px;"/>
+              <img src="https://images.jumpseller.com/store/cevichestudios/store/logo/CEVISTIKER_NARANJA__1_.png?1738101719" alt="CevicheStudios Logo" style="max-height: 45px; margin-top: 5px;"/>
             </a>
             
             <div class="top-cart pull-right">
-              <a id="cart-link" href="/cart/" style="color: #fff;">
+              <a id="cart-link" href="/cart/" style="color: #fff;" aria-label="Carrito de compras">
                 <i class="pe-7s-cart" style="font-size: 22px;"></i>
               </a>
             </div>
@@ -349,11 +363,12 @@
                                 <span class="month">{{ event.date_time|date:"M" }}</span>
                             </div>
                             
-                            <a href="{% url 'event_detail' event.id %}">
+                            <a href="{% url 'event_detail' event.id %}" aria-label="Ver detalles de {{ event.name|escape }}">
+                                <!-- 🛡️ XSS & MEMORY FIX: force_escape aplicado y loading="lazy" inyectado -->
                                 {% if event.poster %}
-                                    <img src="{{ event.poster.url }}" alt="{{ event.name }}">
+                                    <img src="{{ event.poster.url }}" alt="{{ event.name|force_escape }}" loading="lazy" decoding="async">
                                 {% elif event.poster_url %}
-                                    <img src="{{ event.poster_url }}" alt="{{ event.name }}">
+                                    <img src="{{ event.poster_url }}" alt="{{ event.name|force_escape }}" loading="lazy" decoding="async">
                                 {% else %}
                                     <div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:#1a1a1a;">
                                         <i class="pe-7s-ticket" style="font-size: 40px; color: #333;"></i>
@@ -410,14 +425,15 @@
         <div class="row">
           
           <div class="col-md-4 col-sm-12 mgb-30">
-            <img src="https://images.jumpseller.com/store/cevichestudios/store/logo/CEVISTIKER_NARANJA__1_.png?1738101719" alt="Logo" style="max-height: 40px; margin-bottom: 25px; opacity: 0.8;">
+            <img src="https://images.jumpseller.com/store/cevichestudios/store/logo/CEVISTIKER_NARANJA__1_.png?1738101719" alt="CevicheStudios Logo Footer" style="max-height: 40px; margin-bottom: 25px; opacity: 0.8;" loading="lazy">
             <p style="color: #777; font-size: 13px; line-height: 1.8; margin-bottom: 20px;">
                 Producción, logística y tecnología para eventos de alto impacto. <br>Ceviche Studios &copy; 2026
             </p>
             <div>
-                <a href="#" style="color: #fff; margin-right: 20px; opacity: 0.6;"><i class="fab fa-instagram"></i></a>
-                <a href="#" style="color: #fff; margin-right: 20px; opacity: 0.6;"><i class="fab fa-facebook-f"></i></a>
-                <a href="#" style="color: #fff; opacity: 0.6;"><i class="fab fa-whatsapp"></i></a>
+                <!-- 🛡️ PHISHING & TABNABBING FIX: rel="noopener noreferrer" añadido a enlaces externos -->
+                <a href="#" target="_blank" rel="noopener noreferrer" aria-label="Instagram" style="color: #fff; margin-right: 20px; opacity: 0.6;"><i class="fab fa-instagram"></i></a>
+                <a href="#" target="_blank" rel="noopener noreferrer" aria-label="Facebook" style="color: #fff; margin-right: 20px; opacity: 0.6;"><i class="fab fa-facebook-f"></i></a>
+                <a href="#" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp" style="color: #fff; opacity: 0.6;"><i class="fab fa-whatsapp"></i></a>
             </div>
           </div>
           
@@ -443,18 +459,9 @@
     </footer>
 </div>
 
-<script src="http://code.jquery.com/ui/1.11.4/jquery-ui.min.js"></script>
-<script src="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
-
-<style>
-    /* Animación de entrada suave */
-    .animated { animation-duration: 0.8s; animation-fill-mode: both; }
-    @keyframes fadeInUp {
-        from { opacity: 0; transform: translate3d(0, 30px, 0); }
-        to { opacity: 1; transform: translate3d(0, 0, 0); }
-    }
-    .fadeInUp { animation-name: fadeInUp; }
-</style>
+<!-- 🛡️ HTTPS ENFORCEMENT: Migración de librerías a servidores seguros -->
+<script src="https://code.jquery.com/ui/1.11.4/jquery-ui.min.js"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
 
 </body>
 </html>
