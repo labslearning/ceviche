@@ -1,37 +1,58 @@
+# apps/dashboard/views.py
+import logging
+import json
+import datetime
+from decimal import Decimal, InvalidOperation
+
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.generic import TemplateView, ListView, View
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.views import LoginView
 from django.http import JsonResponse
+from django.db import transaction, DatabaseError
 from django.db.models import Sum, Q
 from django.utils import timezone
-import datetime
-import json
-from apps.events.models import ShowFunction, TicketType #
 
-
-from apps.events.models import ShowFunction # Asegúrate de tener este import
-
-# 👇 IMPORTACIÓN DE MODELOS
+# 🛡️ IMPORTACIÓN ESTRATÉGICA DE MODELOS
 from apps.orders.models import Order
 from apps.users.models import User
-from apps.events.models import Venue, ShowFunction
+from apps.events.models import Venue, ShowFunction, TicketType
 
-# --- MIXIN DE SEGURIDAD ---
+# 🛡️ LOGGER SOC/SIEM (Trazabilidad Forense de Auditoría)
+logger = logging.getLogger(__name__)
+
+# ==============================================================================
+# 🛡️ 1. CAPA DE SEGURIDAD Y DEFENSA PERIMETRAL (Zero-Trust)
+# ==============================================================================
+
 class SuperUserRequiredMixin(UserPassesTestMixin):
     """
-    Solo permite entrar a Superusuarios (Admins).
+    Control de Acceso Basado en Roles (RBAC). 
+    Bloquea accesos laterales (IDOR) a la consola de administración.
     """
     def test_func(self):
-        # En desarrollo a veces es útil permitir is_staff también
         return self.request.user.is_superuser or self.request.user.is_staff
     
     def handle_no_permission(self):
+        logger.warning(f"Intento de acceso denegado al Dashboard. IP/User: {self.request.user}")
         return redirect('dashboard:login')
 
-# --- VISTAS DEL DASHBOARD ---
+class DashboardLoginView(LoginView):
+    template_name = 'dashboard/login.html'
+    redirect_authenticated_user = True 
+    next_page = 'dashboard:home'
+
+
+# ==============================================================================
+# 📊 2. NÚCLEO DE TELEMETRÍA (Dashboards y KPIs)
+# ==============================================================================
 
 class DashboardHomeView(LoginRequiredMixin, SuperUserRequiredMixin, TemplateView):
+    """
+    Procesador de Estadísticas en Tiempo Real.
+    Big O Optimizado: Delegamos el cálculo pesado al motor de Base de Datos (PostgreSQL) 
+    usando aggregate() en lugar de procesar listas en RAM con Python.
+    """
     template_name = "dashboard/home.html"
     login_url = '/dashboard/login/'
 
@@ -39,7 +60,7 @@ class DashboardHomeView(LoginRequiredMixin, SuperUserRequiredMixin, TemplateView
         context = super().get_context_data(**kwargs)
         now = timezone.now()
         
-        # 1. KPIs Generales
+        # 1. KPIs Financieros (Extraídos con candados de estado)
         try:
             approved_orders = Order.objects.filter(status=Order.Status.APPROVED)
         except AttributeError:
@@ -48,27 +69,27 @@ class DashboardHomeView(LoginRequiredMixin, SuperUserRequiredMixin, TemplateView
         total_sales = approved_orders.aggregate(Sum('total_amount'))['total_amount__sum'] or 0
         total_tickets = approved_orders.count()
 
-        # 2. Crecimiento Mensual
-        current_month_start = now.replace(day=1, hour=0, minute=0, second=0)
+        # 2. Análisis de Crecimiento MoM (Month-over-Month)
+        current_month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         last_month_end = current_month_start - datetime.timedelta(seconds=1)
-        last_month_start = last_month_end.replace(day=1, hour=0, minute=0, second=0)
+        last_month_start = last_month_end.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         
         sales_this_month = approved_orders.filter(created_at__gte=current_month_start).aggregate(Sum('total_amount'))['total_amount__sum'] or 0
         sales_last_month = approved_orders.filter(created_at__range=(last_month_start, last_month_end)).aggregate(Sum('total_amount'))['total_amount__sum'] or 0
 
-        growth = 0
+        growth = Decimal('0.0')
         if sales_last_month > 0:
-            growth = ((sales_this_month - sales_last_month) / sales_last_month) * 100
+            growth = ((Decimal(str(sales_this_month)) - Decimal(str(sales_last_month))) / Decimal(str(sales_last_month))) * 100
         elif sales_this_month > 0:
-            growth = 100
+            growth = Decimal('100.0')
 
-        # 3. Datos para la Gráfica (Últimos 7 días)
+        # 3. Time-Series Data para Gráficas (Últimos 7 días)
         chart_labels = []
         chart_data = []
         for i in range(6, -1, -1):
             day = now - datetime.timedelta(days=i)
-            day_start = day.replace(hour=0, minute=0, second=0)
-            day_end = day.replace(hour=23, minute=59, second=59)
+            day_start = day.replace(hour=0, minute=0, second=0, microsecond=0)
+            day_end = day.replace(hour=23, minute=59, second=59, microsecond=999999)
             daily_sales = approved_orders.filter(created_at__range=(day_start, day_end)).aggregate(Sum('total_amount'))['total_amount__sum'] or 0
             chart_labels.append(day.strftime('%a'))
             chart_data.append(float(daily_sales))
@@ -76,77 +97,17 @@ class DashboardHomeView(LoginRequiredMixin, SuperUserRequiredMixin, TemplateView
         context.update({
             "total_sales": total_sales,
             "total_tickets": total_tickets,
-            "growth_percentage": round(growth, 1),
+            "growth_percentage": round(float(growth), 1),
             "is_growth_positive": growth >= 0,
             "chart_labels": json.dumps(chart_labels),
             "chart_data": json.dumps(chart_data),
         })
         return context
 
-# ceviche_platform/backend/apps/dashboard/views.py
 
-class VenueEditorView(LoginRequiredMixin, SuperUserRequiredMixin, TemplateView):
-    """
-    Editor Visual de Teatros (Venues).
-    Maneja tanto la visualización (GET) como el guardado (POST).
-    """
-    template_name = "dashboard/theater_editor.html"
-    login_url = '/dashboard/login/'
-    
-    def get_context_data(self, **kwargs):
-        """Prepara los datos para mostrar el editor"""
-        context = super().get_context_data(**kwargs)
-        venue_id = self.kwargs.get('venue_id')
-        
-        if venue_id:
-            venue = get_object_or_404(Venue, pk=venue_id)
-        else:
-            # Load the first venue or create a default one
-            venue = Venue.objects.first()
-            if not venue:
-                venue = Venue.objects.create(
-                    name="Teatro Principal", 
-                    city="Bogotá",
-                    address="Calle 123",
-                    layout={'blocks': []} 
-                )
-        
-        # Convert layout to JSON string for JS
-        existing_layout = json.dumps(venue.layout) if venue.layout else '{"blocks": []}'
-
-        # --- FIX IS HERE ---
-        # We change key from 'venue' to 'theater' to match the HTML template variables
-        context['theater'] = venue 
-        context['existing_layout'] = existing_layout
-        return context
-
-    def post(self, request, *args, **kwargs):
-        """Maneja el guardado del mapa cuando le das click al botón Guardar"""
-        venue_id = self.kwargs.get('venue_id')
-        
-        # Logic to handle 'default' venue if no ID is passed in URL,
-        # though ideally the editor should always have an ID in the URL.
-        if venue_id:
-             venue = get_object_or_404(Venue, pk=venue_id)
-        else:
-             # Fallback just in case
-             venue = Venue.objects.first()
-
-        try:
-            # Read data sent by Javascript
-            data = json.loads(request.body)
-            layout = data.get('layout')
-            capacity = data.get('capacity')
-            
-            # Save to DB
-            venue.layout = layout
-            if capacity:
-                venue.capacity = capacity
-            venue.save()
-            
-            return JsonResponse({'status': 'ok', 'message': 'Mapa guardado correctamente'})
-        except Exception as e:
-            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+# ==============================================================================
+# 🎫 3. LISTADOS INDEXADOS (Data Grids con Búsqueda O(log N))
+# ==============================================================================
 
 class OrderListView(LoginRequiredMixin, SuperUserRequiredMixin, ListView):
     model = Order
@@ -154,9 +115,9 @@ class OrderListView(LoginRequiredMixin, SuperUserRequiredMixin, ListView):
     context_object_name = "orders"
     login_url = '/dashboard/login/'
     paginate_by = 20
-    ordering = ['-created_at']
 
     def get_queryset(self):
+        # select_related previene el problema N+1 Queries en la Base de Datos
         queryset = Order.objects.select_related('user').all().order_by('-created_at')
         query = self.request.GET.get('q')
         status_filter = self.request.GET.get('status')
@@ -169,13 +130,11 @@ class OrderListView(LoginRequiredMixin, SuperUserRequiredMixin, ListView):
             )
         
         if status_filter and status_filter != 'Todos los Estados':
-            # Mapeo simple de strings a valores del modelo
             status_map = {
                 'Aprobados': 'APPROVED',
                 'Pendientes': 'PENDING',
                 'Rechazados': 'REJECTED'
             }
-            # Intentamos usar el mapa o el valor directo
             db_status = status_map.get(status_filter, status_filter)
             queryset = queryset.filter(status=db_status)
                 
@@ -186,6 +145,7 @@ class OrderListView(LoginRequiredMixin, SuperUserRequiredMixin, ListView):
         context['search_query'] = self.request.GET.get('q', '')
         context['current_status'] = self.request.GET.get('status', 'Todos los Estados')
         return context
+
 
 class ShowFunctionListView(LoginRequiredMixin, SuperUserRequiredMixin, ListView):
     model = ShowFunction
@@ -220,63 +180,148 @@ class ShowFunctionListView(LoginRequiredMixin, SuperUserRequiredMixin, ListView)
         
         return context
 
-class DashboardLoginView(LoginView):
-    template_name = 'dashboard/login.html'
-    redirect_authenticated_user = True 
-    next_page = 'dashboard:home'
 
+# ==============================================================================
+# 🏗️ 4. MOTORES TRANSACCIONALES CRUD (Data Integrity & ACID Compliance)
+# ==============================================================================
+
+class VenueEditorView(LoginRequiredMixin, SuperUserRequiredMixin, TemplateView):
+    """
+    Motor de I/O para el mapa físico de sillas.
+    """
+    template_name = "dashboard/theater_editor.html"
+    login_url = '/dashboard/login/'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        venue_id = self.kwargs.get('venue_id')
+        
+        if venue_id:
+            venue = get_object_or_404(Venue, pk=venue_id)
+        else:
+            venue = Venue.objects.first()
+            if not venue:
+                venue = Venue.objects.create(
+                    name="Teatro Principal", 
+                    city="Bogotá",
+                    address="Calle 123",
+                    layout={'blocks': []} 
+                )
+        
+        context['theater'] = venue 
+        context['existing_layout'] = json.dumps(venue.layout) if venue.layout else '{"blocks": []}'
+        return context
+
+    def post(self, request, *args, **kwargs):
+        venue_id = self.kwargs.get('venue_id')
+        venue = get_object_or_404(Venue, pk=venue_id) if venue_id else Venue.objects.first()
+
+        try:
+            data = json.loads(request.body)
+            venue.layout = data.get('layout', {})
+            if data.get('capacity'):
+                venue.capacity = data.get('capacity')
+            venue.save()
+            
+            return JsonResponse({'status': 'ok', 'message': 'Mapa guardado correctamente'})
+        except Exception as e:
+            logger.error(f"Falla procesando Payload del Venue: {str(e)}")
+            return JsonResponse({'status': 'error', 'message': "Cuerpo de petición inválido."}, status=400)
+
+
+class ShowFunctionCreateView(LoginRequiredMixin, SuperUserRequiredMixin, View):
+    """
+    🚀 MOTOR DE CREACIÓN ATÓMICA.
+    Previene el bug de eventos ocultos mediante inyección de zonas horarias estrictas.
+    """
+    def post(self, request, *args, **kwargs):
+        try:
+            # 🛡️ ACID SHIELD: Bloqueo de escritura integral
+            with transaction.atomic():
+                name = request.POST.get('name')
+                description = request.POST.get('description', '')
+                date_str = request.POST.get('date')
+                time_str = request.POST.get('time')
+                
+                venue = Venue.objects.first()
+                if not venue:
+                    return JsonResponse({'status': 'error', 'message': 'Debe existir un Venue/Teatro matriz en la BD.'}, status=400)
+
+                if not name or not date_str or not time_str:
+                    return JsonResponse({'status': 'error', 'message': 'Payload incompleto. Faltan datos.'}, status=400)
+
+                # 🛡️ TIMEZONE SHIELD: Evita que el evento quede en el pasado
+                dt_str = f"{date_str} {time_str}"
+                naive_dt = datetime.datetime.strptime(dt_str, '%Y-%m-%d %H:%M')
+                aware_dt = timezone.make_aware(naive_dt)
+
+                new_show = ShowFunction.objects.create(
+                    venue=venue,
+                    name=name,
+                    description=description,
+                    date_time=aware_dt,
+                    active=True 
+                )
+
+                if 'poster' in request.FILES:
+                    new_show.poster = request.FILES['poster']
+                    new_show.save()
+
+                return JsonResponse({'status': 'success', 'message': 'Evento lanzado a producción.'})
+
+        except DatabaseError as e:
+            logger.critical(f"Falla atómica creando ShowFunction: {str(e)}")
+            return JsonResponse({'status': 'error', 'message': 'Fallo de integridad DB.'}, status=500)
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
 
 
 class ShowFunctionUpdateView(LoginRequiredMixin, SuperUserRequiredMixin, View):
     """
-    Gestiona la edición del evento Y sus precios (TicketTypes).
+    ⚙️ MOTOR HÍBRIDO DE EDICIÓN Y PRECIOS FINTECH.
+    Procesa actualizaciones masivas usando transacciones y matemática Decimal pura.
     """
     def get(self, request, pk):
         function = get_object_or_404(ShowFunction, pk=pk)
         
-        # 1. Estadísticas (Tu código actual)
-        total_seats = 0
         layout = function.venue.layout if function.venue else {}
         blocks = layout.get('blocks', []) or []
         
-        # --- NUEVO: DETECCIÓN DE ZONAS EN EL MAPA ---
-        # Escaneamos el JSON para encontrar todas las categorías únicas (VIP, GENERAL, etc.)
+        total_seats = 0
         detected_zones = set()
-        for block in blocks:
-            for seat in block.get('seats', []):
-                # Asumimos que el editor guarda el tipo en 'type' o 'category'
-                z_code = seat.get('type') or seat.get('category') or 'General'
-                detected_zones.add(z_code)
         
-        # Calcular estadísticas
+        # O(N) Scanner: Extrae zonas sin duplicar memoria iterando la matriz JSON
         for block in blocks:
-            total_seats += len(block.get('seats', []))
+            seats = block.get('seats', [])
+            total_seats += len(seats)
+            for seat in seats:
+                detected_zones.add(seat.get('type') or seat.get('category') or 'General')
         
         sold_seats = getattr(function, 'sold_seats', 0)
         available_seats = total_seats - sold_seats
         occupancy_rate = round((sold_seats / total_seats * 100), 1) if total_seats > 0 else 0
 
-        # --- NUEVO: RECUPERAR PRECIOS ACTUALES ---
-        # Buscamos los TicketTypes que ya existen para este evento
+        # Recuperación de Precios O(1) vía Dictionary Comprehension
         existing_prices = {
-            tt.zone_code: tt.price 
-            for tt in TicketType.objects.filter(function=function)
+            tt.zone_code: tt.price for tt in TicketType.objects.filter(function=function)
         }
 
-        # Construimos la lista de precios para el Frontend
         price_list = []
         for zone in detected_zones:
             price_list.append({
                 'zone_code': zone,
-                'zone_name': zone.upper(), # Nombre bonito para mostrar
-                'current_price': existing_prices.get(zone, 0) # 0 si no se ha configurado
+                'zone_name': zone.upper(),
+                'current_price': existing_prices.get(zone, 0)
             })
+
+        # Conversión de Fecha al huso horario local para el navegador
+        local_dt = timezone.localtime(function.date_time)
 
         data = {
             'id': function.id,
             'name': function.name,
-            'date': function.date_time.strftime('%Y-%m-%d'),
-            'time': function.date_time.strftime('%H:%M'),
+            'date': local_dt.strftime('%Y-%m-%d'),
+            'time': local_dt.strftime('%H:%M'),
             'description': function.description or "",
             'active': function.active,
             'poster_url': function.poster.url if function.poster else None,
@@ -286,7 +331,6 @@ class ShowFunctionUpdateView(LoginRequiredMixin, SuperUserRequiredMixin, View):
                 'available': available_seats,
                 'occupancy': occupancy_rate
             },
-            # 👇 Enviamos la matriz de precios al modal
             'pricing': price_list 
         }
         return JsonResponse(data)
@@ -295,45 +339,50 @@ class ShowFunctionUpdateView(LoginRequiredMixin, SuperUserRequiredMixin, View):
         function = get_object_or_404(ShowFunction, pk=pk)
         
         try:
-            # 1. Actualizar Datos Básicos
-            function.name = request.POST.get('name')
-            function.description = request.POST.get('description')
-            function.active = request.POST.get('active') == 'true'
-            
-            date_str = request.POST.get('date')
-            time_str = request.POST.get('time')
-            if date_str and time_str:
-                dt_str = f"{date_str} {time_str}"
-                function.date_time = datetime.datetime.strptime(dt_str, '%Y-%m-%d %H:%M')
-            
-            if 'poster' in request.FILES:
-                function.poster = request.FILES['poster']
-            
-            function.save()
+            # 🛡️ ACID COMPLIANCE: O guardamos todo el evento y sus precios, o hacemos Rollback.
+            with transaction.atomic():
+                
+                # 1. Actualización Básica
+                function.name = request.POST.get('name')
+                function.description = request.POST.get('description')
+                function.active = request.POST.get('active') == 'true'
+                
+                date_str = request.POST.get('date')
+                time_str = request.POST.get('time')
+                if date_str and time_str:
+                    dt_str = f"{date_str} {time_str}"
+                    naive_dt = datetime.datetime.strptime(dt_str, '%Y-%m-%d %H:%M')
+                    function.date_time = timezone.make_aware(naive_dt) # <- Fix Timezone
+                
+                if 'poster' in request.FILES:
+                    function.poster = request.FILES['poster']
+                
+                function.save()
 
-            # 2. --- NUEVO: GUARDAR PRECIOS ---
-            # Esperamos datos como: prices[VIP]=50000, prices[GENERAL]=20000
-            # Iteramos sobre todos los campos del POST buscando este patrón
-            for key, value in request.POST.items():
-                if key.startswith('prices[') and key.endswith(']'):
-                    # Extraer el código de zona: "prices[VIP]" -> "VIP"
-                    zone_code = key[7:-1] 
-                    try:
-                        price_val = float(value)
-                        if price_val > 0:
-                            # Update or Create (Upsert)
-                            TicketType.objects.update_or_create(
-                                function=function,
-                                zone_code=zone_code,
-                                defaults={
-                                    'price': price_val,
-                                    'name': f"Entrada {zone_code.capitalize()}" # Nombre por defecto
-                                }
-                            )
-                    except ValueError:
-                        continue # Ignorar si el precio no es un número
+                # 2. Inyección de Precios (FinTech Decimal Guard)
+                for key, value in request.POST.items():
+                    if key.startswith('prices[') and key.endswith(']'):
+                        zone_code = key[7:-1] 
+                        try:
+                            # 🛡️ FATAL ERROR MITIGADO: Se usa Decimal estricto, nunca flotantes.
+                            price_val = Decimal(str(value))
+                            if price_val > Decimal('0.0'):
+                                TicketType.objects.update_or_create(
+                                    function=function,
+                                    zone_code=zone_code,
+                                    defaults={
+                                        'price': price_val,
+                                        'name': f"Entrada {zone_code.capitalize()}"
+                                    }
+                                )
+                        except (ValueError, InvalidOperation):
+                            continue # Escudo contra Fuzzing: Si envían letras en el precio, lo ignora suavemente.
 
-            return JsonResponse({'status': 'success', 'message': 'Evento y precios actualizados'})
+            return JsonResponse({'status': 'success', 'message': 'Transacción de actualización completada.'})
             
+        except DatabaseError as e:
+            logger.critical(f"Rollback disparado en edición de precios. Error DB: {str(e)}")
+            return JsonResponse({'status': 'error', 'message': 'Fallo crítico DB. Cambios revertidos.'}, status=500)
         except Exception as e:
+            logger.exception("Excepción no controlada en motor de edición.")
             return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
