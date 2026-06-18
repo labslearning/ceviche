@@ -3,6 +3,7 @@ import logging
 import json
 import datetime
 import urllib.request
+import uuid  # 👈 Añadido para validación criptográfica de IDs
 from urllib.error import URLError
 from decimal import Decimal, InvalidOperation
 
@@ -277,7 +278,7 @@ class VenueEditorView(LoginRequiredMixin, SuperUserRequiredMixin, TemplateView):
 
 class ShowFunctionCreateView(LoginRequiredMixin, SuperUserRequiredMixin, View):
     """
-    🚀 MOTOR DE CREACIÓN ATÓMICA CON SCRAPER INCORPORADO.
+    🚀 MOTOR DE CREACIÓN ATÓMICA CON VINCULACIÓN DINÁMICA DE TEATROS (GOD-TIER).
     """
     def post(self, request, *args, **kwargs):
         try:
@@ -288,20 +289,31 @@ class ShowFunctionCreateView(LoginRequiredMixin, SuperUserRequiredMixin, View):
                 date_str = request.POST.get('date')
                 time_str = request.POST.get('time')
                 
-                venue = Venue.objects.first()
-                if not venue:
-                    return JsonResponse({'status': 'error', 'message': 'Debe existir un Venue/Teatro matriz en la BD.'}, status=400)
+                # 🔍 VALIDACIÓN CRIPTOGRÁFICA Y DE INTEGRIDAD REFERENCIAL DEL TEATRO
+                venue_id = request.POST.get('venue_id')
+                if not venue_id:
+                    return JsonResponse({'status': 'error', 'message': 'Denegado: Es obligatorio vincular una Matriz Física (Teatro) al evento.'}, status=400)
+                
+                # 🛡️ Prevención de Memory Dumps y Crashes (Protección UUID)
+                try:
+                    val_uuid = uuid.UUID(venue_id)
+                    venue = Venue.objects.get(pk=val_uuid)
+                except (ValueError, TypeError, Venue.DoesNotExist):
+                    logger.warning(f"Intento de inyección de UUID inválido o Teatro inexistente: {venue_id}")
+                    return JsonResponse({'status': 'error', 'message': 'Falla de Integridad: El Teatro especificado no existe o la conexión se perdió.'}, status=400)
 
+                # Validación de carga útil
                 if not name or not date_str or not time_str:
-                    return JsonResponse({'status': 'error', 'message': 'Payload incompleto. Faltan datos críticos.'}, status=400)
+                    return JsonResponse({'status': 'error', 'message': 'Payload incompleto. Faltan datos críticos en la petición.'}, status=400)
 
-                # 🛡️ TIMEZONE SHIELD: Evita que el evento quede en el pasado
+                # 🛡️ TIMEZONE SHIELD: Evita desfases en servidores Cloud
                 dt_str = f"{date_str} {time_str}"
                 naive_dt = datetime.datetime.strptime(dt_str, '%Y-%m-%d %H:%M')
                 aware_dt = timezone.make_aware(naive_dt)
 
+                # Inserción en Base de Datos
                 new_show = ShowFunction.objects.create(
-                    venue=venue,
+                    venue=venue, # 👈 Vínculo explícito y validado
                     name=name,
                     description=description,
                     date_time=aware_dt,
@@ -311,12 +323,13 @@ class ShowFunctionCreateView(LoginRequiredMixin, SuperUserRequiredMixin, View):
                 # 🛡️ INGESTIÓN MULTIMEDIA
                 process_and_save_poster(new_show, request)
 
-                return JsonResponse({'status': 'success', 'message': 'Evento y gráfica lanzados a producción.'})
+                return JsonResponse({'status': 'success', 'message': 'Nodo de Evento y activos lanzados a producción.'})
 
         except DatabaseError as e:
             logger.critical(f"Falla atómica creando ShowFunction: {str(e)}")
-            return JsonResponse({'status': 'error', 'message': 'Fallo de integridad DB.'}, status=500)
+            return JsonResponse({'status': 'error', 'message': 'Fallo de integridad DB en PostgreSQL.'}, status=500)
         except Exception as e:
+            logger.exception("Excepción no controlada en motor de creación.")
             return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
 
 
@@ -362,6 +375,7 @@ class ShowFunctionUpdateView(LoginRequiredMixin, SuperUserRequiredMixin, View):
         data = {
             'id': function.id,
             'name': function.name,
+            'venue_id': str(function.venue.id) if function.venue else "", # 👈 Inyectado para pre-seleccionar teatro actual
             'date': local_dt.strftime('%Y-%m-%d'),
             'time': local_dt.strftime('%H:%M'),
             'description': function.description or "",
@@ -388,6 +402,15 @@ class ShowFunctionUpdateView(LoginRequiredMixin, SuperUserRequiredMixin, View):
                 function.description = request.POST.get('description')
                 function.active = request.POST.get('active') == 'true'
                 
+                # 🔄 PERMITE ACTUALIZAR EL TEATRO (Si se envió en el payload)
+                venue_id = request.POST.get('venue_id')
+                if venue_id:
+                    try:
+                        val_uuid = uuid.UUID(venue_id)
+                        function.venue = Venue.objects.get(pk=val_uuid)
+                    except (ValueError, TypeError, Venue.DoesNotExist):
+                        pass # Si hay error silencioso, conserva el teatro actual.
+                
                 date_str = request.POST.get('date')
                 time_str = request.POST.get('time')
                 if date_str and time_str:
@@ -405,7 +428,7 @@ class ShowFunctionUpdateView(LoginRequiredMixin, SuperUserRequiredMixin, View):
                     if key.startswith('prices[') and key.endswith(']'):
                         zone_code = key[7:-1] 
                         try:
-                            # Se usa Decimal estricto, nunca flotantes.
+                            # Se usa Decimal estricto, nunca flotantes para precisión bancaria.
                             price_val = Decimal(str(value))
                             if price_val > Decimal('0.0'):
                                 TicketType.objects.update_or_create(
@@ -428,7 +451,10 @@ class ShowFunctionUpdateView(LoginRequiredMixin, SuperUserRequiredMixin, View):
             logger.exception("Excepción no controlada en motor de edición.")
             return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
 
-# Añade esto al final de apps/dashboard/views.py
+
+# ==============================================================================
+# 🚨 5. PROTOCOLO DE ERRADICACIÓN DE NODOS (DELETE VIEW)
+# ==============================================================================
 
 class ShowFunctionDeleteView(LoginRequiredMixin, SuperUserRequiredMixin, View):
     """
