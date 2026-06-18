@@ -2,6 +2,8 @@
 import logging
 import json
 import datetime
+import urllib.request
+from urllib.error import URLError
 from decimal import Decimal, InvalidOperation
 
 from django.shortcuts import render, redirect, get_object_or_404
@@ -12,6 +14,7 @@ from django.http import JsonResponse
 from django.db import transaction, DatabaseError
 from django.db.models import Sum, Q
 from django.utils import timezone
+from django.core.files.base import ContentFile
 
 # 🛡️ IMPORTACIÓN ESTRATÉGICA DE MODELOS
 from apps.orders.models import Order
@@ -20,6 +23,54 @@ from apps.events.models import Venue, ShowFunction, TicketType
 
 # 🛡️ LOGGER SOC/SIEM (Trazabilidad Forense de Auditoría)
 logger = logging.getLogger(__name__)
+
+# ==============================================================================
+# 🚀 MOTOR DE INGESTIÓN MULTI-ORIGEN (God-Tier Web Scraper)
+# ==============================================================================
+
+def process_and_save_poster(show_obj, request):
+    """
+    Motor de captura de activos multimedia.
+    Mitiga ataques de Hotlinking y Fugas de Memoria (OOM).
+    Si se detecta una URL, el backend viaja, extrae el binario y lo almacena localmente.
+    """
+    poster_file = request.FILES.get('poster')
+    poster_url = request.POST.get('poster_url', '').strip()
+
+    # 1. Prioridad 1: Si el usuario subió un archivo físico manualmente
+    if poster_file and poster_file.name:
+        show_obj.poster = poster_file
+        show_obj.save()
+        return
+
+    # 2. Prioridad 2: Si el usuario pegó un enlace de internet
+    if poster_url and poster_url.startswith('http'):
+        try:
+            # 🛡️ User-Agent Spoofing: Evita ser detectado como Bot/Scraper por WAFs
+            req = urllib.request.Request(poster_url, headers={
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8'
+            })
+            
+            # 🛡️ Timeout Shield: Previene ataques Slowloris limitando a 5 segundos
+            with urllib.request.urlopen(req, timeout=5) as response:
+                # 🛡️ Memory Limit Shield (OOM Protection): Límite estricto de 5 Megabytes
+                MAX_SIZE = 5 * 1024 * 1024 
+                file_content = response.read(MAX_SIZE + 1)
+                
+                if len(file_content) > MAX_SIZE:
+                    raise ValueError("El archivo excede la cuota militar de 5MB. Ingestión abortada.")
+
+                img_name = poster_url.split("/")[-1].split("?")[0]
+                if not img_name or not img_name.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
+                    img_name = f"poster_{show_obj.id}.jpg"
+                
+                # Guarda el binario descargado directamente en el ecosistema de Django
+                show_obj.poster.save(img_name, ContentFile(file_content), save=True)
+                
+        except Exception as e:
+            logger.error(f"God-Tier Ingestion Error: Fallo descargando póster URL {poster_url} -> {str(e)}")
+
 
 # ==============================================================================
 # 🛡️ 1. CAPA DE SEGURIDAD Y DEFENSA PERIMETRAL (Zero-Trust)
@@ -50,8 +101,7 @@ class DashboardLoginView(LoginView):
 class DashboardHomeView(LoginRequiredMixin, SuperUserRequiredMixin, TemplateView):
     """
     Procesador de Estadísticas en Tiempo Real.
-    Big O Optimizado: Delegamos el cálculo pesado al motor de Base de Datos (PostgreSQL) 
-    usando aggregate() en lugar de procesar listas en RAM con Python.
+    Big O Optimizado: Delegamos el cálculo pesado al motor de Base de Datos.
     """
     template_name = "dashboard/home.html"
     login_url = '/dashboard/login/'
@@ -60,7 +110,6 @@ class DashboardHomeView(LoginRequiredMixin, SuperUserRequiredMixin, TemplateView
         context = super().get_context_data(**kwargs)
         now = timezone.now()
         
-        # 1. KPIs Financieros (Extraídos con candados de estado)
         try:
             approved_orders = Order.objects.filter(status=Order.Status.APPROVED)
         except AttributeError:
@@ -69,7 +118,6 @@ class DashboardHomeView(LoginRequiredMixin, SuperUserRequiredMixin, TemplateView
         total_sales = approved_orders.aggregate(Sum('total_amount'))['total_amount__sum'] or 0
         total_tickets = approved_orders.count()
 
-        # 2. Análisis de Crecimiento MoM (Month-over-Month)
         current_month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         last_month_end = current_month_start - datetime.timedelta(seconds=1)
         last_month_start = last_month_end.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -83,7 +131,6 @@ class DashboardHomeView(LoginRequiredMixin, SuperUserRequiredMixin, TemplateView
         elif sales_this_month > 0:
             growth = Decimal('100.0')
 
-        # 3. Time-Series Data para Gráficas (Últimos 7 días)
         chart_labels = []
         chart_data = []
         for i in range(6, -1, -1):
@@ -117,7 +164,6 @@ class OrderListView(LoginRequiredMixin, SuperUserRequiredMixin, ListView):
     paginate_by = 20
 
     def get_queryset(self):
-        # select_related previene el problema N+1 Queries en la Base de Datos
         queryset = Order.objects.select_related('user').all().order_by('-created_at')
         query = self.request.GET.get('q')
         status_filter = self.request.GET.get('status')
@@ -231,8 +277,7 @@ class VenueEditorView(LoginRequiredMixin, SuperUserRequiredMixin, TemplateView):
 
 class ShowFunctionCreateView(LoginRequiredMixin, SuperUserRequiredMixin, View):
     """
-    🚀 MOTOR DE CREACIÓN ATÓMICA.
-    Previene el bug de eventos ocultos mediante inyección de zonas horarias estrictas.
+    🚀 MOTOR DE CREACIÓN ATÓMICA CON SCRAPER INCORPORADO.
     """
     def post(self, request, *args, **kwargs):
         try:
@@ -248,7 +293,7 @@ class ShowFunctionCreateView(LoginRequiredMixin, SuperUserRequiredMixin, View):
                     return JsonResponse({'status': 'error', 'message': 'Debe existir un Venue/Teatro matriz en la BD.'}, status=400)
 
                 if not name or not date_str or not time_str:
-                    return JsonResponse({'status': 'error', 'message': 'Payload incompleto. Faltan datos.'}, status=400)
+                    return JsonResponse({'status': 'error', 'message': 'Payload incompleto. Faltan datos críticos.'}, status=400)
 
                 # 🛡️ TIMEZONE SHIELD: Evita que el evento quede en el pasado
                 dt_str = f"{date_str} {time_str}"
@@ -263,11 +308,10 @@ class ShowFunctionCreateView(LoginRequiredMixin, SuperUserRequiredMixin, View):
                     active=True 
                 )
 
-                if 'poster' in request.FILES:
-                    new_show.poster = request.FILES['poster']
-                    new_show.save()
+                # 🛡️ INGESTIÓN MULTIMEDIA
+                process_and_save_poster(new_show, request)
 
-                return JsonResponse({'status': 'success', 'message': 'Evento lanzado a producción.'})
+                return JsonResponse({'status': 'success', 'message': 'Evento y gráfica lanzados a producción.'})
 
         except DatabaseError as e:
             logger.critical(f"Falla atómica creando ShowFunction: {str(e)}")
@@ -279,7 +323,6 @@ class ShowFunctionCreateView(LoginRequiredMixin, SuperUserRequiredMixin, View):
 class ShowFunctionUpdateView(LoginRequiredMixin, SuperUserRequiredMixin, View):
     """
     ⚙️ MOTOR HÍBRIDO DE EDICIÓN Y PRECIOS FINTECH.
-    Procesa actualizaciones masivas usando transacciones y matemática Decimal pura.
     """
     def get(self, request, pk):
         function = get_object_or_404(ShowFunction, pk=pk)
@@ -290,7 +333,7 @@ class ShowFunctionUpdateView(LoginRequiredMixin, SuperUserRequiredMixin, View):
         total_seats = 0
         detected_zones = set()
         
-        # O(N) Scanner: Extrae zonas sin duplicar memoria iterando la matriz JSON
+        # O(N) Scanner: Extrae zonas sin duplicar memoria
         for block in blocks:
             seats = block.get('seats', [])
             total_seats += len(seats)
@@ -301,7 +344,7 @@ class ShowFunctionUpdateView(LoginRequiredMixin, SuperUserRequiredMixin, View):
         available_seats = total_seats - sold_seats
         occupancy_rate = round((sold_seats / total_seats * 100), 1) if total_seats > 0 else 0
 
-        # Recuperación de Precios O(1) vía Dictionary Comprehension
+        # Recuperación de Precios O(1)
         existing_prices = {
             tt.zone_code: tt.price for tt in TicketType.objects.filter(function=function)
         }
@@ -314,7 +357,6 @@ class ShowFunctionUpdateView(LoginRequiredMixin, SuperUserRequiredMixin, View):
                 'current_price': existing_prices.get(zone, 0)
             })
 
-        # Conversión de Fecha al huso horario local para el navegador
         local_dt = timezone.localtime(function.date_time)
 
         data = {
@@ -339,10 +381,9 @@ class ShowFunctionUpdateView(LoginRequiredMixin, SuperUserRequiredMixin, View):
         function = get_object_or_404(ShowFunction, pk=pk)
         
         try:
-            # 🛡️ ACID COMPLIANCE: O guardamos todo el evento y sus precios, o hacemos Rollback.
+            # 🛡️ ACID COMPLIANCE: O guardamos todo, o hacemos Rollback.
             with transaction.atomic():
                 
-                # 1. Actualización Básica
                 function.name = request.POST.get('name')
                 function.description = request.POST.get('description')
                 function.active = request.POST.get('active') == 'true'
@@ -352,19 +393,19 @@ class ShowFunctionUpdateView(LoginRequiredMixin, SuperUserRequiredMixin, View):
                 if date_str and time_str:
                     dt_str = f"{date_str} {time_str}"
                     naive_dt = datetime.datetime.strptime(dt_str, '%Y-%m-%d %H:%M')
-                    function.date_time = timezone.make_aware(naive_dt) # <- Fix Timezone
-                
-                if 'poster' in request.FILES:
-                    function.poster = request.FILES['poster']
+                    function.date_time = timezone.make_aware(naive_dt)
                 
                 function.save()
+
+                # 🛡️ INGESTIÓN MULTIMEDIA AL ACTUALIZAR
+                process_and_save_poster(function, request)
 
                 # 2. Inyección de Precios (FinTech Decimal Guard)
                 for key, value in request.POST.items():
                     if key.startswith('prices[') and key.endswith(']'):
                         zone_code = key[7:-1] 
                         try:
-                            # 🛡️ FATAL ERROR MITIGADO: Se usa Decimal estricto, nunca flotantes.
+                            # Se usa Decimal estricto, nunca flotantes.
                             price_val = Decimal(str(value))
                             if price_val > Decimal('0.0'):
                                 TicketType.objects.update_or_create(
@@ -376,7 +417,7 @@ class ShowFunctionUpdateView(LoginRequiredMixin, SuperUserRequiredMixin, View):
                                     }
                                 )
                         except (ValueError, InvalidOperation):
-                            continue # Escudo contra Fuzzing: Si envían letras en el precio, lo ignora suavemente.
+                            continue
 
             return JsonResponse({'status': 'success', 'message': 'Transacción de actualización completada.'})
             
