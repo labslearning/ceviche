@@ -8,7 +8,8 @@ from .views import (
     ShowFunctionListView,
     DashboardLoginView,
     ShowFunctionUpdateView,
-    ShowFunctionCreateView  # 👈 Añadido: Importación del motor de creación atómica
+    ShowFunctionCreateView,
+    ShowFunctionDeleteView  # 👈 Añadido: Importación del motor de purga (DELETE)
 )
 
 # 🔑 Namespace para las URLs (ej: {% url 'dashboard:home' %})
@@ -47,6 +48,9 @@ urlpatterns = [
     # 2. MOTOR DE CREACIÓN (El eslabón que faltaba)
     path('events/create/', ShowFunctionCreateView.as_view(), name='event_create'),
     
-    # 3. MOTOR DE EDICIÓN Y PRECIOS (Corregido, se eliminó el duplicado)
+    # 3. MOTOR DE EDICIÓN Y PRECIOS 
     path('events/<uuid:pk>/edit/', ShowFunctionUpdateView.as_view(), name='event_edit'),
+    
+    # 🚨 4. MOTOR DE ERRADICACIÓN (Nueva ruta para el botón de borrar)
+    path('events/<uuid:pk>/delete/', ShowFunctionDeleteView.as_view(), name='event_delete'),
 ]
