@@ -9,73 +9,73 @@
     }
 </script>
 
-<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 animate-fade-in-down" role="region" aria-label="Indicadores clave de rendimiento">
-    <div class="glass-panel p-5 rounded-xl border border-slate-700/50 flex items-center justify-between relative overflow-hidden group">
+<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-6 md:mb-8 animate-fade-in-down" role="region" aria-label="Indicadores clave de rendimiento">
+    <div class="glass-panel p-4 md:p-5 rounded-xl border border-slate-700/50 flex items-center justify-between relative overflow-hidden group">
         <div class="absolute inset-0 bg-gradient-to-r from-brand-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
         <div class="relative z-10">
-            <p class="text-[10px] text-slate-400 uppercase font-black tracking-widest mb-1">Total Eventos</p>
-            <h3 class="text-3xl font-mono font-bold text-white drop-shadow-md">{{ total_count|default:"0" }}</h3>
+            <p class="text-[10px] md:text-xs text-slate-400 uppercase font-black tracking-widest mb-1">Total Eventos</p>
+            <h3 class="text-2xl md:text-3xl font-mono font-bold text-white drop-shadow-md">{{ total_count|default:"0" }}</h3>
         </div>
-        <div class="w-12 h-12 rounded-full bg-brand-500/10 flex items-center justify-center text-brand-400 shadow-inner relative z-10 border border-brand-500/20">
-            <i class="fa-solid fa-database text-lg"></i>
+        <div class="w-10 h-10 md:w-12 md:h-12 rounded-full bg-brand-500/10 flex items-center justify-center text-brand-400 shadow-inner relative z-10 border border-brand-500/20">
+            <i class="fa-solid fa-database text-base md:text-lg"></i>
         </div>
     </div>
     
-    <div class="glass-panel p-5 rounded-xl border border-slate-700/50 flex items-center justify-between relative overflow-hidden group">
+    <div class="glass-panel p-4 md:p-5 rounded-xl border border-slate-700/50 flex items-center justify-between relative overflow-hidden group">
         <div class="absolute inset-0 bg-gradient-to-r from-emerald-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
         <div class="relative z-10">
-            <p class="text-[10px] text-slate-400 uppercase font-black tracking-widest mb-1">En Cartelera</p>
-            <h3 class="text-3xl font-mono font-bold text-emerald-400 drop-shadow-md">{{ active_count|default:"0" }}</h3>
+            <p class="text-[10px] md:text-xs text-slate-400 uppercase font-black tracking-widest mb-1">En Cartelera</p>
+            <h3 class="text-2xl md:text-3xl font-mono font-bold text-emerald-400 drop-shadow-md">{{ active_count|default:"0" }}</h3>
         </div>
-        <div class="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-400 shadow-inner relative z-10 border border-emerald-500/20">
-            <i class="fa-solid fa-satellite-dish text-lg animate-pulse"></i>
+        <div class="w-10 h-10 md:w-12 md:h-12 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-400 shadow-inner relative z-10 border border-emerald-500/20">
+            <i class="fa-solid fa-satellite-dish text-base md:text-lg animate-pulse"></i>
         </div>
     </div>
 
-    <div class="glass-panel p-5 rounded-xl border border-slate-700/50 flex items-center justify-between relative overflow-hidden group">
+    <div class="glass-panel p-4 md:p-5 rounded-xl border border-slate-700/50 flex items-center justify-between relative overflow-hidden group sm:col-span-2 md:col-span-1">
         <div class="absolute inset-0 bg-gradient-to-r from-amber-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
         <div class="relative z-10">
-            <p class="text-[10px] text-slate-400 uppercase font-black tracking-widest mb-1">Impacto / Destacados</p>
-            <h3 class="text-3xl font-mono font-bold text-amber-400 drop-shadow-md">{{ featured_count|default:"0" }}</h3>
+            <p class="text-[10px] md:text-xs text-slate-400 uppercase font-black tracking-widest mb-1">Destacados</p>
+            <h3 class="text-2xl md:text-3xl font-mono font-bold text-amber-400 drop-shadow-md">{{ featured_count|default:"0" }}</h3>
         </div>
-        <div class="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-400 shadow-inner relative z-10 border border-amber-500/20">
-            <i class="fa-solid fa-bolt text-lg"></i>
+        <div class="w-10 h-10 md:w-12 md:h-12 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-400 shadow-inner relative z-10 border border-amber-500/20">
+            <i class="fa-solid fa-bolt text-base md:text-lg"></i>
         </div>
     </div>
 </div>
 
-<div class="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-6">
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
     <div>
-        <h2 class="text-2xl font-black text-white tracking-tight font-ui">Malla de Espectáculos</h2>
-        <p class="text-xs text-slate-400 font-mono mt-1">Gestor criptográfico de inventarios y activos multimedia.</p>
+        <h2 class="text-xl md:text-2xl font-black text-white tracking-tight font-ui">Malla de Espectáculos</h2>
+        <p class="text-[10px] md:text-xs text-slate-400 font-mono mt-1">Gestor criptográfico de inventarios y activos.</p>
     </div>
     
-    <button type="button" onclick="CevicheKernel.openCreateModal()" class="bg-gradient-to-r from-brand-600 to-brand-500 hover:from-brand-500 hover:to-brand-400 text-white px-6 py-3 rounded-lg shadow-[0_0_20px_rgba(255,102,0,0.3)] transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center gap-3 font-bold border border-brand-400/50 cursor-pointer">
-        <i class="fa-solid fa-layer-group"></i> Inicializar Nuevo Evento
+    <button type="button" onclick="CevicheKernel.openCreateModal()" class="w-full sm:w-auto bg-gradient-to-r from-brand-600 to-brand-500 hover:from-brand-500 hover:to-brand-400 text-white px-6 py-3.5 rounded-lg shadow-[0_0_20px_rgba(255,102,0,0.4)] transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-3 font-bold border border-brand-400/50 cursor-pointer">
+        <i class="fa-solid fa-layer-group"></i> Inicializar Nodo
     </button>
 </div>
 
-<div class="glass-panel p-5 rounded-xl mb-8 border border-slate-700/50 shadow-2xl relative overflow-hidden">
-    <div class="absolute top-0 left-0 w-1 h-full bg-slate-600"></div>
-    <form method="get" class="flex flex-col md:flex-row gap-4 relative z-10">
+<div class="glass-panel p-4 md:p-5 rounded-xl mb-8 border border-slate-700/50 shadow-2xl relative overflow-hidden">
+    <div class="absolute top-0 left-0 w-1 h-full bg-brand-500 shadow-[0_0_10px_#ff6600]"></div>
+    <form method="get" class="flex flex-col md:flex-row gap-3 relative z-10">
         <div class="relative flex-1">
-            <i class="fa-solid fa-microscope absolute left-4 top-3.5 text-slate-500"></i>
+            <i class="fa-solid fa-microscope absolute left-4 top-4 text-slate-500"></i>
             <input type="text" name="q" value="{{ search_query }}" 
-                placeholder="Escaneo profundo por título, hash o descripción..." 
+                placeholder="Escaneo por título o descripción..." 
                 autocomplete="off" spellcheck="false"
-                class="w-full bg-[#050507] border border-slate-700/80 rounded-lg pl-11 pr-10 py-3 text-slate-200 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all font-mono text-sm placeholder:text-slate-600">
+                class="w-full bg-[#050507] border border-slate-700/80 rounded-lg pl-11 pr-10 py-3.5 text-slate-200 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all font-mono text-sm placeholder:text-slate-600 shadow-inner">
             
             {% if search_query %}
-            <a href="{% url 'dashboard:event_list' %}" class="absolute right-3 top-3.5 text-slate-500 hover:text-red-400 transition-colors" title="Purgar filtro">
+            <a href="{% url 'dashboard:event_list' %}" class="absolute right-3 top-4 text-slate-500 hover:text-brand-500 transition-colors" title="Purgar filtro">
                 <i class="fa-solid fa-circle-xmark text-lg"></i>
             </a>
             {% endif %}
         </div>
 
         <div class="w-full md:w-64 relative">
-            <i class="fa-solid fa-filter absolute left-4 top-3.5 text-slate-500 z-10"></i>
+            <i class="fa-solid fa-filter absolute left-4 top-4 text-slate-500 z-10"></i>
             <select name="status" onchange="this.form.submit()"
-                class="w-full bg-[#050507] border border-slate-700/80 rounded-lg pl-11 pr-8 py-3 text-slate-200 focus:outline-none focus:border-brand-500 cursor-pointer appearance-none font-mono text-sm font-bold">
+                class="w-full bg-[#050507] border border-slate-700/80 rounded-lg pl-11 pr-8 py-3.5 text-slate-200 focus:outline-none focus:border-brand-500 cursor-pointer appearance-none font-mono text-sm font-bold shadow-inner">
                 <option value="all" {% if current_status == 'all' %}selected{% endif %}>Matriz Global</option>
                 <option value="active" {% if current_status == 'active' %}selected{% endif %}>Nodos Activos (Live)</option>
                 <option value="inactive" {% if current_status == 'inactive' %}selected{% endif %}>Nodos Suspendidos</option>
@@ -85,17 +85,17 @@
     </form>
 </div>
 
-<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
     {% for event in events %}
     <div class="glass-panel rounded-xl border border-slate-700/50 overflow-hidden group hover:border-brand-500/60 hover:shadow-[0_0_30px_rgba(255,102,0,0.15)] transition-all duration-400 relative flex flex-col h-full bg-[#0a0a0c]">
         
-        <div class="h-52 bg-[#050505] relative overflow-hidden transform-gpu">
+        <div class="h-48 md:h-52 bg-[#050505] relative overflow-hidden transform-gpu">
             {% if event.poster %}
-                <img src="{{ event.poster.url }}" alt="Poster de {{ event.name|force_escape }}" loading="lazy" decoding="async" class="w-full h-full object-cover opacity-70 group-hover:opacity-100 group-hover:scale-[1.03] transition-transform duration-700 ease-out">
+                <img src="{{ event.poster.url }}" alt="Poster de {{ event.name|force_escape }}" loading="lazy" decoding="async" class="w-full h-full object-cover opacity-70 group-hover:opacity-100 group-hover:scale-[1.05] transition-transform duration-700 ease-out">
             {% else %}
                 <div class="w-full h-full flex flex-col items-center justify-center bg-[#050505] pattern-grid-lg text-slate-800">
-                    <i class="fa-solid fa-fingerprint text-5xl mb-2"></i>
-                    <span class="text-[9px] font-mono tracking-widest">SIN ASIGNACIÓN VISUAL</span>
+                    <i class="fa-solid fa-fingerprint text-4xl md:text-5xl mb-2"></i>
+                    <span class="text-[8px] md:text-[9px] font-mono tracking-widest">SIN ASIGNACIÓN VISUAL</span>
                 </div>
             {% endif %}
             
@@ -103,68 +103,73 @@
 
             <div class="absolute top-3 right-3 flex gap-2">
                 {% if event.active %}
-                    <span class="px-3 py-1.5 rounded-md text-[9px] font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 backdrop-blur-md shadow-lg tracking-widest uppercase">
-                        <i class="fa-solid fa-satellite-dish text-[8px] mr-1 align-baseline animate-pulse"></i> Transmitiendo
+                    <span class="px-2.5 py-1.5 rounded-md text-[8px] md:text-[9px] font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 backdrop-blur-md shadow-lg tracking-widest uppercase">
+                        <i class="fa-solid fa-satellite-dish text-[8px] mr-1 animate-pulse"></i> LIVE
                     </span>
                 {% else %}
-                    <span class="px-3 py-1.5 rounded-md text-[9px] font-black bg-slate-800/80 text-slate-400 border border-slate-600/50 backdrop-blur-md shadow-lg tracking-widest uppercase">
-                        <i class="fa-solid fa-power-off text-[8px] mr-1 align-baseline"></i> Apagado
+                    <span class="px-2.5 py-1.5 rounded-md text-[8px] md:text-[9px] font-black bg-slate-800/80 text-slate-400 border border-slate-600/50 backdrop-blur-md shadow-lg tracking-widest uppercase">
+                        <i class="fa-solid fa-power-off text-[8px] mr-1"></i> OFF
                     </span>
                 {% endif %}
             </div>
         </div>
 
-        <div class="p-6 flex-1 flex flex-col relative z-10">
-            <h3 class="text-xl font-black text-white mb-3 leading-tight group-hover:text-brand-400 transition-colors font-ui">{{ event.name }}</h3>
+        <div class="p-5 flex-1 flex flex-col relative z-10">
+            <h3 class="text-lg md:text-xl font-black text-white mb-3 leading-tight group-hover:text-brand-400 transition-colors font-ui line-clamp-1">{{ event.name }}</h3>
             
-            <div class="flex flex-col gap-2 mb-5">
-                <div class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2 bg-white/5 p-1.5 rounded border border-white/5 w-max pr-3">
-                    <div class="w-5 text-center text-brand-500"><i class="fa-solid fa-map-pin"></i></div> {{ event.venue.name }}
+            <div class="flex flex-col gap-2 mb-4">
+                <div class="text-[10px] md:text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2 bg-white/5 p-1.5 rounded border border-white/5 w-max pr-3">
+                    <div class="w-5 text-center text-brand-500"><i class="fa-solid fa-map-pin"></i></div> <span class="truncate max-w-[150px]">{{ event.venue.name }}</span>
                 </div>
-                <div class="text-xs text-slate-400 font-mono flex items-center gap-2 bg-white/5 p-1.5 rounded border border-white/5 w-max pr-3">
+                <div class="text-[10px] md:text-xs text-slate-400 font-mono flex items-center gap-2 bg-white/5 p-1.5 rounded border border-white/5 w-max pr-3">
                     <div class="w-5 text-center text-slate-500"><i class="fa-solid fa-clock-rotate-left"></i></div> {{ event.date_time|date:"d M Y, h:i A" }}
                 </div>
             </div>
             
-            <p class="text-xs text-slate-500 mb-6 line-clamp-2 flex-1 font-light leading-relaxed">
-                {{ event.description|default:"Registro sin sinopsis. Los metadatos descriptivos están vacíos." }}
+            <p class="text-xs text-slate-500 mb-5 line-clamp-2 flex-1 font-light leading-relaxed">
+                {{ event.description|default:"Metadatos descriptivos vacíos." }}
             </p>
             
-            <div class="grid grid-cols-3 gap-1 mb-5 bg-[#050505] rounded-lg border border-slate-700/60 p-1">
-                <div class="text-center p-2 rounded bg-white/5">
-                    <div class="text-[8px] text-slate-500 uppercase font-black mb-1">Aforo Total</div>
-                    <div class="font-mono text-white font-bold text-sm">{{ event.total_seats|default:"0" }}</div>
+            <div class="grid grid-cols-3 gap-1 mb-5 bg-[#050505] rounded-lg border border-slate-700/60 p-1.5 shadow-inner">
+                <div class="text-center p-1.5 rounded bg-white/5">
+                    <div class="text-[7px] md:text-[8px] text-slate-500 uppercase font-black mb-1">Aforo</div>
+                    <div class="font-mono text-white font-bold text-xs md:text-sm">{{ event.total_seats|default:"0" }}</div>
                 </div>
-                <div class="text-center p-2 rounded bg-white/5">
-                    <div class="text-[8px] text-slate-500 uppercase font-black mb-1">Ejecutado</div>
-                    <div class="font-mono text-brand-400 font-bold text-sm">{{ event.sold_seats|default:"0" }}</div>
+                <div class="text-center p-1.5 rounded bg-white/5 border-b-2 border-brand-500/50">
+                    <div class="text-[7px] md:text-[8px] text-brand-500 uppercase font-black mb-1">Vendido</div>
+                    <div class="font-mono text-brand-400 font-bold text-xs md:text-sm">{{ event.sold_seats|default:"0" }}</div>
                 </div>
-                <div class="text-center p-2 rounded bg-white/5">
-                    <div class="text-[8px] text-slate-500 uppercase font-black mb-1">Residual</div>
-                    <div class="font-mono text-emerald-400 font-bold text-sm">{{ event.available_seats|default:"0" }}</div>
+                <div class="text-center p-1.5 rounded bg-white/5 border-b-2 border-emerald-500/50">
+                    <div class="text-[7px] md:text-[8px] text-emerald-500 uppercase font-black mb-1">Libre</div>
+                    <div class="font-mono text-emerald-400 font-bold text-xs md:text-sm">{{ event.available_seats|default:"0" }}</div>
                 </div>
             </div>
 
-            <div class="flex items-center justify-between pt-4 border-t border-slate-800 mt-auto gap-3">
-                <button onclick="CevicheKernel.openEventDetails('{{ event.id }}')" class="flex-1 px-4 py-2.5 rounded-lg bg-[#050505] border border-slate-700 hover:border-slate-500 hover:bg-slate-800 text-slate-300 transition-all text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 cursor-pointer focus:ring-2 focus:ring-slate-500 outline-none">
+            <div class="flex items-center justify-between pt-4 border-t border-slate-800 mt-auto gap-2">
+                <button onclick="CevicheKernel.openEventDetails('{{ event.id }}')" class="flex-1 px-3 py-2.5 rounded-lg bg-[#050505] border border-slate-700 hover:border-brand-500 hover:bg-slate-800 text-slate-300 transition-all text-[10px] md:text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 cursor-pointer focus:ring-2 focus:ring-brand-500 outline-none">
                     <i class="fa-solid fa-radar text-brand-500"></i> Analítica
                 </button>
                 
-                <button onclick="CevicheKernel.openEditModal('{{ event.id }}')" class="px-4 py-2.5 rounded-lg bg-brand-600 hover:bg-brand-500 text-white transition-all shadow-lg shadow-brand-500/20 border border-brand-400/30 cursor-pointer focus:ring-2 focus:ring-brand-500 outline-none" title="Ingresar al Kernel del Evento">
-                    <i class="fa-solid fa-terminal"></i>
-                </button>
+                <div class="flex gap-2">
+                    <button onclick="CevicheKernel.openEditModal('{{ event.id }}')" class="w-10 h-10 md:w-11 md:h-11 rounded-lg bg-brand-600 hover:bg-brand-500 text-white transition-all shadow-[0_0_10px_rgba(255,102,0,0.3)] border border-brand-400/30 flex items-center justify-center cursor-pointer focus:ring-2 focus:ring-brand-500 outline-none" title="Ingresar al Kernel del Evento">
+                        <i class="fa-solid fa-pen text-sm"></i>
+                    </button>
+                    <button onclick="CevicheKernel.deleteEventNode('{{ event.id }}')" class="w-10 h-10 md:w-11 md:h-11 rounded-lg bg-red-950/40 hover:bg-red-600 text-red-500 hover:text-white transition-all border border-red-900/50 flex items-center justify-center cursor-pointer focus:ring-2 focus:ring-red-500 outline-none shadow-[0_0_10px_rgba(239,68,68,0.1)]" title="Erradicar Nodo">
+                        <i class="fa-solid fa-trash-can text-sm"></i>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
     {% empty %}
-    <div class="col-span-full py-28 flex flex-col items-center justify-center text-center text-slate-500 border-2 border-dashed border-slate-800 rounded-xl bg-[#050507]">
-        <div class="w-24 h-24 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center mb-6 shadow-inner relative overflow-hidden">
-            <i class="fa-solid fa-ghost text-4xl text-slate-700 relative z-10"></i>
+    <div class="col-span-full py-20 md:py-28 flex flex-col items-center justify-center text-center text-slate-500 border-2 border-dashed border-slate-800 rounded-xl bg-[#050507] px-4">
+        <div class="w-20 h-20 md:w-24 md:h-24 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center mb-6 shadow-inner relative overflow-hidden">
+            <i class="fa-solid fa-ghost text-3xl md:text-4xl text-slate-700 relative z-10"></i>
             <div class="absolute inset-0 bg-brand-500/5 animate-pulse"></div>
         </div>
-        <h3 class="text-xl font-black text-slate-300 mb-2 font-ui tracking-tight">Clúster de Eventos Vacío</h3>
-        <p class="text-xs text-slate-500 max-w-md mx-auto mb-8 font-mono leading-relaxed">La matriz de PostgreSQL no retornó nodos activos bajo los parámetros actuales. Proceda a inyectar un nuevo registro.</p>
-        <button type="button" onclick="CevicheKernel.openCreateModal()" class="bg-brand-600 hover:bg-brand-500 text-white px-8 py-3 rounded-lg font-bold cursor-pointer transition-all shadow-lg shadow-brand-500/20 border border-brand-400/50 uppercase text-xs tracking-widest">
+        <h3 class="text-lg md:text-xl font-black text-slate-300 mb-2 font-ui tracking-tight">Clúster de Eventos Vacío</h3>
+        <p class="text-[10px] md:text-xs text-slate-500 max-w-md mx-auto mb-8 font-mono leading-relaxed">La matriz de PostgreSQL no retornó nodos activos bajo los parámetros actuales. Proceda a inyectar un nuevo registro.</p>
+        <button type="button" onclick="CevicheKernel.openCreateModal()" class="bg-brand-600 hover:bg-brand-500 text-white px-6 md:px-8 py-3 md:py-3.5 rounded-lg font-bold cursor-pointer transition-all shadow-[0_0_20px_rgba(255,102,0,0.3)] border border-brand-400/50 uppercase text-[10px] md:text-xs tracking-widest w-full sm:w-auto">
             <i class="fa-solid fa-bolt mr-2"></i> Inyectar Primer Nodo
         </button>
     </div>
@@ -172,91 +177,91 @@
 </div>
 
 {% if is_paginated %}
-<div class="mt-12 flex items-center justify-center gap-4">
+<div class="mt-10 md:mt-12 flex flex-col sm:flex-row items-center justify-center gap-4">
     {% if page_obj.has_previous %}
         <a href="?page={{ page_obj.previous_page_number }}&q={{ search_query|urlencode }}&status={{ current_status|urlencode }}" 
-           class="px-6 py-3 bg-[#050507] border border-slate-700 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 hover:border-slate-500 transition-all flex items-center gap-3 text-xs font-black uppercase tracking-widest shadow-lg">
+           class="w-full sm:w-auto px-6 py-3 bg-[#050507] border border-slate-700 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 hover:border-slate-500 transition-all flex items-center justify-center gap-3 text-xs font-black uppercase tracking-widest shadow-lg">
            <i class="fa-solid fa-arrow-left text-[10px]"></i> Regresar
         </a>
     {% endif %}
 
-    <span class="text-[10px] text-slate-500 font-mono bg-[#050507] px-5 py-3 rounded-lg border border-slate-800 shadow-inner">
+    <span class="text-[10px] text-slate-500 font-mono bg-[#050507] px-5 py-3 rounded-lg border border-slate-800 shadow-inner w-full sm:w-auto text-center">
         BLOQUE <span class="text-white font-bold text-xs">{{ page_obj.number }}</span> DE <span class="text-white font-bold text-xs">{{ page_obj.paginator.num_pages }}</span>
     </span>
 
     {% if page_obj.has_next %}
         <a href="?page={{ page_obj.next_page_number }}&q={{ search_query|urlencode }}&status={{ current_status|urlencode }}" 
-           class="px-6 py-3 bg-[#050507] border border-slate-700 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 hover:border-slate-500 transition-all flex items-center gap-3 text-xs font-black uppercase tracking-widest shadow-lg">
+           class="w-full sm:w-auto px-6 py-3 bg-[#050507] border border-slate-700 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 hover:border-slate-500 transition-all flex items-center justify-center gap-3 text-xs font-black uppercase tracking-widest shadow-lg">
            Avanzar <i class="fa-solid fa-arrow-right text-[10px]"></i>
         </a>
     {% endif %}
 </div>
 {% endif %}
 
-<div id="modal-details" class="fixed inset-0 bg-black/95 backdrop-blur-2xl z-[9999] hidden flex items-center justify-center p-4 transition-all duration-300 opacity-0 data-[state=open]:opacity-100" aria-modal="true" role="dialog" data-state="closed">
-    <div class="bg-[#0b0b0e] border border-slate-800/80 w-full max-w-5xl h-[85vh] rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.8)] relative flex flex-col md:flex-row overflow-hidden transform scale-95 data-[state=open]:scale-100 transition-transform duration-300">
+<div id="modal-details" class="fixed inset-0 bg-black/95 backdrop-blur-xl z-[9999] hidden flex items-end md:items-center justify-center p-0 md:p-4 transition-all duration-300 opacity-0 data-[state=open]:opacity-100" aria-modal="true" role="dialog" data-state="closed">
+    <div class="bg-[#0b0b0e] border border-slate-800/80 w-full md:max-w-5xl h-[90vh] md:h-[85vh] rounded-t-2xl md:rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.8)] relative flex flex-col md:flex-row overflow-hidden transform translate-y-full md:translate-y-0 md:scale-95 data-[state=open]:translate-y-0 data-[state=open]:scale-100 transition-transform duration-300">
         
-        <button type="button" onclick="CevicheKernel.closeDetails()" class="absolute top-5 right-5 z-50 w-10 h-10 flex items-center justify-center rounded-full bg-black/80 hover:bg-brand-600 text-slate-400 hover:text-white border border-slate-700 hover:border-brand-500 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-500" aria-label="Cerrar telemetría">
+        <button type="button" onclick="CevicheKernel.closeDetails()" class="absolute top-4 right-4 z-50 w-10 h-10 flex items-center justify-center rounded-full bg-black/80 hover:bg-brand-600 text-slate-400 hover:text-white border border-slate-700 hover:border-brand-500 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-500" aria-label="Cerrar telemetría">
             <i class="fa-solid fa-xmark text-lg"></i>
         </button>
 
-        <div class="w-full md:w-5/12 relative bg-[#050505] h-64 md:h-auto border-r border-slate-800/80">
-            <img id="modal-img" src="" class="absolute inset-0 w-full h-full object-cover opacity-50 transition-opacity duration-700 mix-blend-luminosity" alt="Background">
+        <div class="w-full h-48 md:w-5/12 md:h-auto relative bg-[#050505] border-b md:border-b-0 md:border-r border-slate-800/80 shrink-0">
+            <img id="modal-img" src="" class="absolute inset-0 w-full h-full object-cover opacity-40 transition-opacity duration-700 mix-blend-luminosity" alt="Background">
             <div class="absolute inset-0 bg-gradient-to-t from-[#0b0b0e] via-[#0b0b0e]/80 to-transparent md:bg-gradient-to-r"></div>
             
-            <div class="absolute bottom-10 left-8 right-8">
-                <span id="modal-status" class="px-2.5 py-1 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[9px] font-black uppercase tracking-widest mb-4 inline-block shadow-lg">ESTADO_DESCONOCIDO</span>
-                <h2 id="modal-title" class="text-4xl font-black text-white leading-tight mb-3 font-ui drop-shadow-2xl tracking-tighter">Conectando...</h2>
-                <p id="modal-venue" class="text-xs text-brand-400 font-mono tracking-widest bg-black/50 p-2 rounded border border-white/5 w-max"><i class="fa-solid fa-location-crosshairs mr-2"></i><span id="modal-venue-name">--</span></p>
+            <div class="absolute bottom-6 md:bottom-10 left-6 right-6">
+                <span id="modal-status" class="px-2.5 py-1 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[9px] font-black uppercase tracking-widest mb-2 md:mb-4 inline-block shadow-lg">ESTADO_DESCONOCIDO</span>
+                <h2 id="modal-title" class="text-2xl md:text-4xl font-black text-white leading-tight mb-2 md:mb-3 font-ui drop-shadow-2xl tracking-tighter line-clamp-2">Conectando...</h2>
+                <p id="modal-venue" class="text-[10px] md:text-xs text-brand-400 font-mono tracking-widest bg-black/50 p-1.5 md:p-2 rounded border border-white/5 w-max max-w-full truncate"><i class="fa-solid fa-location-crosshairs mr-2"></i><span id="modal-venue-name">--</span></p>
             </div>
         </div>
 
-        <div class="flex-1 p-8 md:p-10 overflow-y-auto custom-scrollbar flex flex-col bg-[#0b0b0e]">
-            <div class="mb-10 bg-[#050505] p-5 rounded-xl border border-slate-800">
+        <div class="flex-1 p-5 md:p-10 overflow-y-auto custom-scrollbar flex flex-col bg-[#0b0b0e]">
+            <div class="mb-6 md:mb-10 bg-[#050505] p-4 md:p-5 rounded-xl border border-slate-800">
                 <h4 class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-3 border-l-2 border-brand-500 pl-3">Metadatos Descriptivos</h4>
-                <p id="modal-desc" class="text-xs text-slate-400 leading-relaxed font-mono whitespace-pre-wrap">Descifrando paquetes...</p>
+                <p id="modal-desc" class="text-[11px] md:text-xs text-slate-400 leading-relaxed font-mono whitespace-pre-wrap">Descifrando paquetes...</p>
             </div>
 
             <div class="flex-1">
-                <h4 class="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-5 border-b border-slate-800 pb-3 flex justify-between items-center">
-                    <span><i class="fa-solid fa-chart-line text-brand-500 mr-2"></i> Flujo Financiero por Zona</span>
-                    <span class="text-[8px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-1 rounded animate-pulse"><i class="fa-solid fa-circle text-[6px] align-middle mr-1"></i> REAL-TIME</span>
+                <h4 class="text-[9px] md:text-[10px] font-black text-slate-300 uppercase tracking-widest mb-4 md:mb-5 border-b border-slate-800 pb-3 flex justify-between items-center">
+                    <span><i class="fa-solid fa-chart-line text-brand-500 mr-2"></i> Flujo Financiero</span>
+                    <span class="text-[8px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-1 rounded animate-pulse hidden sm:inline-block"><i class="fa-solid fa-circle text-[6px] align-middle mr-1"></i> REAL-TIME</span>
                 </h4>
                 
-                <div class="space-y-5" id="stats-container">
-                    <div class="text-center py-16">
-                        <i class="fa-solid fa-atom fa-spin text-brand-500 text-4xl mb-4"></i>
-                        <p class="text-[10px] text-slate-500 font-mono tracking-widest">SINCRONIZANDO CON POSTGRESQL...</p>
+                <div class="space-y-4 md:space-y-5" id="stats-container">
+                    <div class="text-center py-10 md:py-16">
+                        <i class="fa-solid fa-atom fa-spin text-brand-500 text-3xl md:text-4xl mb-4"></i>
+                        <p class="text-[9px] md:text-[10px] text-slate-500 font-mono tracking-widest">SINCRONIZANDO CON DB...</p>
                     </div>
                 </div>
             </div>
 
-            <div class="mt-10 pt-6 border-t border-slate-800 grid grid-cols-2 gap-6 bg-[#050505] p-5 rounded-xl">
+            <div class="mt-6 md:mt-10 pt-5 md:pt-6 border-t border-slate-800 grid grid-cols-2 gap-4 md:gap-6 bg-[#050505] p-4 md:p-5 rounded-xl">
                 <div>
-                    <span class="block text-[8px] text-slate-500 uppercase font-black tracking-widest mb-1.5"><i class="fa-regular fa-calendar text-brand-500"></i> Timestamp de Ejecución</span>
-                    <span id="modal-date" class="text-white font-mono text-sm block font-bold">--/--/--</span>
-                    <span id="modal-time" class="text-slate-400 font-mono text-[10px]">--:--</span>
+                    <span class="block text-[7px] md:text-[8px] text-slate-500 uppercase font-black tracking-widest mb-1.5"><i class="fa-regular fa-calendar text-brand-500"></i> Timestamp</span>
+                    <span id="modal-date" class="text-white font-mono text-xs md:text-sm block font-bold">--/--/--</span>
+                    <span id="modal-time" class="text-slate-400 font-mono text-[9px] md:text-[10px]">--:--</span>
                 </div>
-                <div>
-                    <span class="block text-[8px] text-slate-500 uppercase font-black tracking-widest mb-1.5"><i class="fa-solid fa-fingerprint text-brand-500"></i> UUID del Sistema</span>
-                    <span id="modal-id" class="text-slate-500 font-mono text-[9px] truncate block bg-black p-1.5 rounded border border-slate-800 select-all cursor-text hover:text-white transition-colors" title="Haz clic para copiar">...</span>
+                <div class="overflow-hidden">
+                    <span class="block text-[7px] md:text-[8px] text-slate-500 uppercase font-black tracking-widest mb-1.5"><i class="fa-solid fa-fingerprint text-brand-500"></i> UUID del Sistema</span>
+                    <span id="modal-id" class="text-slate-500 font-mono text-[8px] md:text-[9px] truncate block bg-black p-1.5 rounded border border-slate-800 select-all cursor-text hover:text-white transition-colors" title="Copiar">...</span>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<div id="modal-edit-event" class="fixed inset-0 bg-black/95 backdrop-blur-md z-[9999] hidden flex items-center justify-center p-4 opacity-0 data-[state=open]:opacity-100 transition-opacity duration-300" aria-modal="true" role="dialog" data-state="closed">
-    <div class="bg-[#0b0b0e] border border-slate-700/80 rounded-2xl w-full max-w-xl max-h-[90vh] flex flex-col relative shadow-[0_0_60px_rgba(0,0,0,0.9)] transform scale-95 data-[state=open]:scale-100 transition-transform duration-300">
+<div id="modal-edit-event" class="fixed inset-0 bg-black/95 backdrop-blur-md z-[9999] hidden flex items-end md:items-center justify-center p-0 md:p-4 opacity-0 data-[state=open]:opacity-100 transition-opacity duration-300" aria-modal="true" role="dialog" data-state="closed">
+    <div class="bg-[#0b0b0e] border border-slate-700/80 rounded-t-2xl md:rounded-2xl w-full max-w-xl h-[92vh] md:h-auto md:max-h-[90vh] flex flex-col relative shadow-[0_0_60px_rgba(0,0,0,0.9)] transform translate-y-full md:translate-y-0 md:scale-95 data-[state=open]:translate-y-0 data-[state=open]:scale-100 transition-transform duration-300">
         
-        <div class="p-6 pb-4 border-b border-slate-800 flex justify-between items-center shrink-0 bg-[#050505] rounded-t-2xl">
-            <div class="flex items-center gap-4">
-                <div class="w-10 h-10 rounded-lg bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-brand-500">
-                    <i class="fa-solid fa-microchip text-lg"></i>
+        <div class="p-4 md:p-6 pb-4 border-b border-slate-800 flex justify-between items-center shrink-0 bg-[#050505] rounded-t-2xl shadow-md z-20">
+            <div class="flex items-center gap-3 md:gap-4">
+                <div class="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-brand-500">
+                    <i class="fa-solid fa-microchip text-sm md:text-lg"></i>
                 </div>
                 <div>
-                    <h2 id="modal-edit-title" class="text-lg font-black text-white leading-none font-ui tracking-tight">Kernel de Configuración</h2>
-                    <p class="text-[9px] text-slate-500 font-mono uppercase tracking-widest mt-1">Escritura Segura ACID</p>
+                    <h2 id="modal-edit-title" class="text-base md:text-lg font-black text-white leading-none font-ui tracking-tight">Kernel de Configuración</h2>
+                    <p class="text-[8px] md:text-[9px] text-slate-500 font-mono uppercase tracking-widest mt-1">Escritura Segura ACID</p>
                 </div>
             </div>
             <button type="button" onclick="CevicheKernel.closeEditModal()" class="w-8 h-8 rounded bg-slate-800 text-slate-400 hover:text-white hover:bg-red-500/20 hover:border-red-500/30 border border-transparent transition-all cursor-pointer focus:outline-none flex items-center justify-center">
@@ -264,110 +269,108 @@
             </button>
         </div>
 
-        <div class="p-6 overflow-y-auto custom-scrollbar grow bg-[#0b0b0e]">
+        <div class="p-4 md:p-6 overflow-y-auto custom-scrollbar flex-1 bg-[#0b0b0e] relative z-10 pb-24 md:pb-6">
             
-            <div id="stats-card" class="mb-8 bg-[#050505] border border-slate-800 rounded-xl p-5 relative overflow-hidden shadow-inner">
+            <div id="stats-card" class="mb-6 md:mb-8 bg-[#050505] border border-slate-800 rounded-xl p-4 md:p-5 relative overflow-hidden shadow-inner">
                 <div class="absolute top-0 left-0 w-1 h-full bg-brand-500 shadow-[0_0_10px_#ff6600]"></div>
                 
                 <div class="flex justify-between items-end mb-3 relative z-10">
                     <div>
-                        <span class="text-[9px] uppercase font-black tracking-widest text-slate-500 block mb-1">Carga Topológica Actual</span>
+                        <span class="text-[8px] md:text-[9px] uppercase font-black tracking-widest text-slate-500 block mb-1">Carga Topológica</span>
                         <div class="flex items-baseline gap-2">
-                            <span id="stat-available" class="text-3xl font-mono font-bold text-emerald-400 drop-shadow-md">0</span>
-                            <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Unidades Libres</span>
+                            <span id="stat-available" class="text-2xl md:text-3xl font-mono font-bold text-emerald-400 drop-shadow-md">0</span>
+                            <span class="text-[9px] md:text-[10px] text-slate-400 font-bold uppercase tracking-wider">Libres</span>
                         </div>
                     </div>
                     <div class="text-right">
-                        <span id="stat-occupancy" class="text-[10px] font-black text-brand-400 bg-brand-500/10 px-2.5 py-1 rounded border border-brand-500/30 shadow-inner">0% Ocupación</span>
+                        <span id="stat-occupancy" class="text-[9px] md:text-[10px] font-black text-brand-400 bg-brand-500/10 px-2 py-1 md:px-2.5 rounded border border-brand-500/30 shadow-inner">0% Ocup</span>
                     </div>
                 </div>
 
-                <div class="w-full h-2 bg-slate-900 rounded-full overflow-hidden mt-3 border border-slate-800">
+                <div class="w-full h-1.5 md:h-2 bg-slate-900 rounded-full overflow-hidden mt-2 md:mt-3 border border-slate-800">
                     <div id="stat-progress" class="h-full bg-gradient-to-r from-brand-600 to-amber-400 transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(255,102,0,0.5)]" style="width: 0%"></div>
                 </div>
                 
-                <div class="flex justify-between mt-3 text-[9px] font-mono text-slate-500 bg-black/40 p-2 rounded">
+                <div class="flex justify-between mt-3 text-[8px] md:text-[9px] font-mono text-slate-500 bg-black/40 p-2 rounded">
                     <span>EXTRACCIÓN: <strong id="stat-sold" class="text-slate-300">0</strong></span>
-                    <span>LÍMITE CAPACIDAD: <strong id="stat-total" class="text-slate-300">0</strong></span>
+                    <span>LÍMITE: <strong id="stat-total" class="text-slate-300">0</strong></span>
                 </div>
             </div>
 
-            <form id="edit-event-form" class="space-y-6" enctype="multipart/form-data">
+            <form id="edit-event-form" class="space-y-5 md:space-y-6" enctype="multipart/form-data">
                 <input type="hidden" id="edit-id" name="id"> 
                 
                 <div class="space-y-1">
-                    <label class="block text-[9px] uppercase font-black tracking-widest text-slate-500">Identificador Público (Nombre)</label>
+                    <label class="block text-[8px] md:text-[9px] uppercase font-black tracking-widest text-slate-500">Identificador Público</label>
                     <input type="text" id="edit-name" name="name" required autocomplete="off" spellcheck="false"
-                           class="w-full bg-[#050505] border border-slate-700/80 rounded-lg px-4 py-3 text-white text-sm focus:border-brand-500 outline-none transition-all focus:ring-2 focus:ring-brand-500/20 font-bold placeholder:text-slate-700">
+                           class="w-full bg-[#050505] border border-slate-700/80 rounded-lg px-3 md:px-4 py-3 md:py-3 text-white text-sm focus:border-brand-500 outline-none transition-all focus:ring-2 focus:ring-brand-500/20 font-bold placeholder:text-slate-700 shadow-inner">
                 </div>
 
-                <div class="grid grid-cols-2 gap-5">
+                <div class="grid grid-cols-2 gap-4 md:gap-5">
                     <div class="space-y-1">
-                        <label class="block text-[9px] uppercase font-black tracking-widest text-slate-500">Vector Temporal (Fecha)</label>
+                        <label class="block text-[8px] md:text-[9px] uppercase font-black tracking-widest text-slate-500">Fecha (Local)</label>
                         <input type="date" id="edit-date" name="date" required 
-                               class="w-full bg-[#050505] border border-slate-700/80 rounded-lg px-4 py-3 text-white text-sm focus:border-brand-500 outline-none transition-all focus:ring-2 focus:ring-brand-500/20 font-mono">
+                               class="w-full bg-[#050505] border border-slate-700/80 rounded-lg px-3 md:px-4 py-3 md:py-3 text-white text-sm focus:border-brand-500 outline-none transition-all focus:ring-2 focus:ring-brand-500/20 font-mono shadow-inner appearance-none">
                     </div>
                     <div class="space-y-1">
-                        <label class="block text-[9px] uppercase font-black tracking-widest text-slate-500">Sincronización (Hora)</label>
+                        <label class="block text-[8px] md:text-[9px] uppercase font-black tracking-widest text-slate-500">Hora</label>
                         <input type="time" id="edit-time" name="time" required 
-                               class="w-full bg-[#050505] border border-slate-700/80 rounded-lg px-4 py-3 text-white text-sm focus:border-brand-500 outline-none transition-all focus:ring-2 focus:ring-brand-500/20 font-mono">
+                               class="w-full bg-[#050505] border border-slate-700/80 rounded-lg px-3 md:px-4 py-3 md:py-3 text-white text-sm focus:border-brand-500 outline-none transition-all focus:ring-2 focus:ring-brand-500/20 font-mono shadow-inner appearance-none">
                     </div>
                 </div>
 
                 <div class="space-y-1">
-                    <label class="block text-[9px] uppercase font-black tracking-widest text-slate-500">Carga Descriptiva (Sinopsis)</label>
+                    <label class="block text-[8px] md:text-[9px] uppercase font-black tracking-widest text-slate-500">Sinopsis Criptográfica</label>
                     <textarea id="edit-desc" name="description" rows="4" spellcheck="false"
-                              class="w-full bg-[#050505] border border-slate-700/80 rounded-lg px-4 py-3 text-white text-xs focus:border-brand-500 outline-none transition-all focus:ring-2 focus:ring-brand-500/20 resize-none font-mono placeholder:text-slate-700"></textarea>
+                              class="w-full bg-[#050505] border border-slate-700/80 rounded-lg px-3 md:px-4 py-3 text-white text-xs focus:border-brand-500 outline-none transition-all focus:ring-2 focus:ring-brand-500/20 resize-none font-mono placeholder:text-slate-700 shadow-inner"></textarea>
                 </div>
 
-                <div class="pt-6 border-t border-slate-800">
-                    <div class="flex items-center justify-between mb-4">
-                        <label class="text-[10px] uppercase font-black tracking-widest text-brand-400 flex items-center gap-2">
-                            <i class="fa-solid fa-satellite-dish"></i> Extracción de Póster (Motor Scraper)
+                <div class="pt-5 md:pt-6 border-t border-slate-800">
+                    <div class="flex items-center justify-between mb-3 md:mb-4">
+                        <label class="text-[9px] md:text-[10px] uppercase font-black tracking-widest text-brand-400 flex items-center gap-2">
+                            <i class="fa-solid fa-satellite-dish"></i> Extracción de Póster
                         </label>
                     </div>
                     
-                    <div class="bg-[#050505] border border-slate-800 p-4 rounded-xl shadow-inner">
-                        <div class="flex gap-2 mb-4 bg-[#0b0b0e] p-1.5 rounded-lg border border-slate-700/50 w-full relative">
-                            <label class="flex-1 flex items-center justify-center gap-2 text-[10px] font-black tracking-widest text-slate-400 cursor-pointer px-4 py-2 rounded transition-all hover:bg-white/5 has-[:checked]:bg-brand-600 has-[:checked]:text-white shadow-sm">
+                    <div class="bg-[#050505] border border-slate-800 p-3 md:p-4 rounded-xl shadow-inner">
+                        <div class="flex gap-2 mb-4 bg-[#0b0b0e] p-1 md:p-1.5 rounded-lg border border-slate-700/50 w-full relative">
+                            <label class="flex-1 flex items-center justify-center gap-1 md:gap-2 text-[9px] md:text-[10px] font-black tracking-widest text-slate-400 cursor-pointer px-2 md:px-4 py-2.5 md:py-2 rounded transition-all hover:bg-white/5 has-[:checked]:bg-brand-600 has-[:checked]:text-white shadow-sm touch-manipulation">
                                 <input type="radio" name="poster_method" value="upload" checked onchange="CevicheKernel.togglePosterMethod()" class="sr-only"> 
-                                <i class="fa-solid fa-hard-drive"></i> Disco Local
+                                <i class="fa-solid fa-hard-drive hidden sm:inline-block"></i> Local
                             </label>
-                            <label class="flex-1 flex items-center justify-center gap-2 text-[10px] font-black tracking-widest text-slate-400 cursor-pointer px-4 py-2 rounded transition-all hover:bg-white/5 has-[:checked]:bg-brand-600 has-[:checked]:text-white shadow-sm">
+                            <label class="flex-1 flex items-center justify-center gap-1 md:gap-2 text-[9px] md:text-[10px] font-black tracking-widest text-slate-400 cursor-pointer px-2 md:px-4 py-2.5 md:py-2 rounded transition-all hover:bg-white/5 has-[:checked]:bg-brand-600 has-[:checked]:text-white shadow-sm touch-manipulation">
                                 <input type="radio" name="poster_method" value="url" onchange="CevicheKernel.togglePosterMethod()" class="sr-only"> 
-                                <i class="fa-solid fa-cloud-arrow-down"></i> URL Directa
+                                <i class="fa-solid fa-cloud-arrow-down hidden sm:inline-block"></i> Red (URL)
                             </label>
                         </div>
 
                         <div id="wrapper-poster-file" class="animate-fade-in-up">
                             <input type="file" id="edit-poster-file" name="poster" accept="image/jpeg, image/png, image/webp" 
-                                class="w-full text-[10px] font-mono text-slate-400 file:mr-4 file:py-2.5 file:px-5 file:rounded-md file:border-0 file:text-[10px] file:font-black file:tracking-widest file:bg-slate-800 file:text-white hover:file:bg-slate-700 cursor-pointer transition-all border border-dashed border-slate-700 p-2 rounded-lg bg-[#0b0b0e]">
-                            <p class="text-[8px] font-mono text-slate-600 mt-2 flex items-center gap-1.5"><i class="fa-solid fa-shield-halved text-emerald-500"></i> Escaneado por el motor binario. Límite: 5MB.</p>
+                                class="w-full text-[9px] md:text-[10px] font-mono text-slate-400 file:mr-3 file:md:mr-4 file:py-2 file:md:py-2.5 file:px-4 file:md:px-5 file:rounded-md file:border-0 file:text-[9px] file:md:text-[10px] file:font-black file:tracking-widest file:bg-slate-800 file:text-white hover:file:bg-slate-700 cursor-pointer transition-all border border-dashed border-slate-700 p-2 rounded-lg bg-[#0b0b0e]">
                         </div>
                             
                         <div id="wrapper-poster-url" class="hidden animate-fade-in-up">
                             <div class="relative">
-                                <i class="fa-solid fa-link absolute left-4 top-3.5 text-slate-500"></i>
-                                <input type="url" id="edit-poster-url" name="poster_url" placeholder="https://dominio-externo.com/imagen.webp" autocomplete="off"
-                                    class="w-full bg-[#0b0b0e] border border-slate-700 rounded-lg pl-10 pr-4 py-3 text-white text-xs font-mono focus:border-brand-500 outline-none transition-colors focus:ring-1 focus:ring-brand-500 placeholder:text-slate-700">
+                                <i class="fa-solid fa-link absolute left-3.5 md:left-4 top-3.5 md:top-4 text-slate-500"></i>
+                                <input type="url" id="edit-poster-url" name="poster_url" placeholder="https://dominio.com/img.jpg" autocomplete="off"
+                                    class="w-full bg-[#0b0b0e] border border-slate-700 rounded-lg pl-10 md:pl-10 pr-4 py-3 md:py-3.5 text-white text-xs font-mono focus:border-brand-500 outline-none transition-colors focus:ring-1 focus:ring-brand-500 placeholder:text-slate-600 shadow-inner">
                             </div>
-                            <p class="text-[8px] font-mono text-slate-600 mt-2 flex items-center gap-1.5"><i class="fa-solid fa-user-secret text-brand-500"></i> El backend evadirá WAFs usando User-Agent Spoofing para descargar la imagen.</p>
                         </div>
                     </div>
                 </div>
 
-                <div id="pricing-section" class="pt-6 border-t border-slate-800">
-                    <div class="flex items-center justify-between mb-4">
-                        <label class="text-[10px] uppercase font-black tracking-widest text-brand-400 flex items-center gap-2">
-                            <i class="fa-solid fa-money-bill-transfer"></i> Algoritmo de Precios (Por Topología)
+                <div id="pricing-section" class="pt-5 md:pt-6 border-t border-slate-800">
+                    <div class="flex items-center justify-between mb-3 md:mb-4">
+                        <label class="text-[9px] md:text-[10px] uppercase font-black tracking-widest text-brand-400 flex items-center gap-2">
+                            <i class="fa-solid fa-money-bill-transfer"></i> Algoritmo de Precios
                         </label>
                     </div>
-                    <div class="bg-[#050505] rounded-xl border border-slate-800 overflow-hidden shadow-inner">
-                        <table class="w-full text-left border-collapse">
+                    <div class="bg-[#050505] rounded-xl border border-slate-800 overflow-hidden shadow-inner overflow-x-auto custom-scrollbar">
+                        <table class="w-full text-left border-collapse min-w-[300px]">
                             <thead class="bg-slate-900/50 border-b border-slate-800">
                                 <tr>
-                                    <th class="py-3 px-4 text-[9px] uppercase font-black tracking-widest text-slate-500">ID de Zona</th>
-                                    <th class="py-3 px-4 text-[9px] uppercase font-bold tracking-widest text-slate-500 text-right">Valor Fiat (COP)</th>
+                                    <th class="py-3 px-4 text-[8px] md:text-[9px] uppercase font-black tracking-widest text-slate-500">ID de Zona</th>
+                                    <th class="py-3 px-4 text-[8px] md:text-[9px] uppercase font-bold tracking-widest text-slate-500 text-right">Valor Fiat (COP)</th>
                                 </tr>
                             </thead>
                             <tbody id="pricing-table-body" class="divide-y divide-slate-800/50">
@@ -377,64 +380,58 @@
                 </div>
 
                 <div class="pt-4 border-t border-slate-800">
-                    <label class="flex items-center gap-3 bg-[#050505] p-4 rounded-xl border border-slate-800 shadow-inner w-full cursor-pointer hover:border-slate-700 transition-colors group">
+                    <label class="flex items-center gap-3 bg-[#050505] p-3 md:p-4 rounded-xl border border-slate-800 shadow-inner w-full cursor-pointer hover:border-slate-700 transition-colors group touch-manipulation">
                         <div class="relative flex items-center justify-center">
                             <input type="checkbox" id="edit-active" name="active" class="peer sr-only">
                             <div class="w-10 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
                         </div>
                         <div>
-                            <span class="text-xs text-white font-black uppercase tracking-widest block">Nodo Activo (Público)</span>
-                            <span class="text-[9px] text-slate-500 font-mono block mt-0.5">Habilita la exposición inmediata en el catálogo frontend.</span>
+                            <span class="text-[10px] md:text-xs text-white font-black uppercase tracking-widest block">Nodo Activo (Público)</span>
+                            <span class="text-[8px] md:text-[9px] text-slate-500 font-mono block mt-0.5">Expone el evento al catálogo frontend.</span>
                         </div>
                     </label>
                 </div>
             </form>
         </div>
 
-        <div class="p-6 pt-5 border-t border-slate-800 flex justify-end gap-4 bg-[#050505] rounded-b-2xl shrink-0">
-            <button type="button" onclick="CevicheKernel.closeEditModal()" class="px-5 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-white hover:bg-slate-800 border border-transparent hover:border-slate-700 transition-all cursor-pointer focus:outline-none">
+        <div class="absolute bottom-0 left-0 w-full p-4 md:p-6 border-t border-slate-800 flex justify-end gap-3 md:gap-4 bg-[#050505] rounded-b-2xl z-30 shadow-[0_-10px_20px_rgba(0,0,0,0.5)] md:relative md:shadow-none">
+            <button type="button" onclick="CevicheKernel.closeEditModal()" class="w-1/3 md:w-auto px-4 md:px-5 py-3 md:py-2.5 rounded-lg text-[9px] md:text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-white hover:bg-slate-800 border border-transparent hover:border-slate-700 transition-all cursor-pointer focus:outline-none">
                 Abortar
             </button>
-            <button type="submit" form="edit-event-form" id="btn-save-edit" class="px-8 py-2.5 rounded-lg bg-brand-600 hover:bg-brand-500 text-white text-[10px] font-black uppercase tracking-widest shadow-[0_0_15px_rgba(255,102,0,0.3)] transition-all flex items-center gap-2 cursor-pointer focus:ring-2 focus:ring-brand-500 outline-none">
+            <button type="submit" form="edit-event-form" id="btn-save-edit" class="flex-1 md:flex-none px-6 md:px-8 py-3 md:py-2.5 rounded-lg bg-brand-600 hover:bg-brand-500 text-white text-[9px] md:text-[10px] font-black uppercase tracking-widest shadow-[0_0_15px_rgba(255,102,0,0.4)] transition-all flex items-center justify-center gap-2 cursor-pointer focus:ring-2 focus:ring-brand-500 outline-none border border-brand-400/50">
                 </button>
         </div>
     </div>
 </div>
 
-<div id="toast-container" class="fixed top-6 right-6 flex flex-col gap-3 pointer-events-none z-[99999]"></div>
+<div id="toast-container" class="fixed top-4 right-0 left-0 px-4 md:left-auto md:right-6 flex flex-col gap-3 pointer-events-none z-[99999] items-center md:items-end"></div>
 
 <script>
-/**
- * CEVICHE KERNEL - MÓDULO DE GESTIÓN SEGURA
- * Arquitectura IIFE (Immediately Invoked Function Expression).
- * Previene el Memory Dumping de variables exponiendo únicamente métodos públicos necesarios.
- */
 const CevicheKernel = (function() {
     'use strict';
 
-    // 🔒 1. PROTECCIÓN DE MEMORIA Y ESTADO (Inmutable)
+    // 🔒 PROTECCIÓN DE MEMORIA Y ESTADO
     const STATE = {
         isRequestPending: false,
         abortController: null
     };
-    Object.seal(STATE); // Impide agregar/borrar propiedades a la máquina de estado
+    Object.seal(STATE);
 
-    // 🛡️ 2. SANITIZADOR CRIPTOGRÁFICO DE DOM (DOMParser)
-    // Superior a simple regex. Evita XSS basados en mutaciones de atributos.
+    // 🛡️ SANITIZADOR CRIPTOGRÁFICO DE DOM
     const sanitizeHTML = (dirtyString) => {
         if (typeof dirtyString !== 'string') return '';
         const doc = new DOMParser().parseFromString(dirtyString, 'text/html');
         return doc.body.textContent || "";
     };
 
-    // 🍞 3. SUBSISTEMA DE TOASTS VISUALES
+    // 🍞 SUBSISTEMA DE TOASTS VISUALES
     const spawnToast = (msg, type = 'success') => {
         const t = document.createElement('div');
         const isErr = type === 'error';
-        t.className = `px-6 py-4 rounded-lg backdrop-blur-2xl shadow-[0_10px_40px_rgba(0,0,0,0.5)] border border-white/10 text-xs font-mono font-bold flex items-center gap-4 animate-fade-in-up max-w-sm ${isErr ? 'bg-red-950/90 text-red-100 border-l-4 border-l-red-500' : 'bg-emerald-950/90 text-emerald-100 border-l-4 border-l-emerald-500'}`;
+        t.className = `w-full md:w-auto px-5 py-4 rounded-lg backdrop-blur-2xl shadow-[0_10px_40px_rgba(0,0,0,0.8)] border border-white/10 text-[10px] md:text-xs font-mono font-bold flex items-center gap-3 animate-fade-in-up md:max-w-sm ${isErr ? 'bg-red-950/95 text-red-100 border-b-4 md:border-b-0 md:border-l-4 border-red-500' : 'bg-emerald-950/95 text-emerald-100 border-b-4 md:border-b-0 md:border-l-4 border-emerald-500'}`;
         t.innerHTML = isErr 
-            ? `<i class="fa-solid fa-skull-crossbones text-red-500 text-lg"></i> <span class="leading-relaxed">${sanitizeHTML(msg)}</span>` 
-            : `<i class="fa-solid fa-shield-check text-emerald-500 text-lg"></i> <span class="leading-relaxed">${sanitizeHTML(msg)}</span>`;
+            ? `<i class="fa-solid fa-skull-crossbones text-red-500 text-lg"></i> <span class="leading-relaxed flex-1">${sanitizeHTML(msg)}</span>` 
+            : `<i class="fa-solid fa-shield-check text-emerald-500 text-lg"></i> <span class="leading-relaxed flex-1">${sanitizeHTML(msg)}</span>`;
         document.getElementById('toast-container').appendChild(t);
         setTimeout(() => { 
             t.classList.replace('animate-fade-in-up', 'opacity-0');
@@ -443,7 +440,7 @@ const CevicheKernel = (function() {
         }, 4000);
     };
 
-    // 🚀 4. LÓGICA DE ALTERNANCIA (PÓSTER URL/FILE)
+    // 🚀 LÓGICA DE ALTERNANCIA (PÓSTER)
     const togglePosterMethod = () => {
         const methodInput = document.querySelector('input[name="poster_method"]:checked');
         if(!methodInput) return;
@@ -465,10 +462,10 @@ const CevicheKernel = (function() {
         }
     };
 
-    // 📊 5. MOTOR DE TELEMETRÍA (Detalles y Ocupación)
+    // 📊 MOTOR DE TELEMETRÍA
     const renderStatsUI = (stats, container) => {
         if (!stats || Object.keys(stats).length === 0) {
-            container.innerHTML = '<div class="text-center bg-[#050505] rounded-lg border border-slate-800 text-slate-500 py-8 text-[10px] font-mono font-bold tracking-widest"><i class="fa-solid fa-ban text-lg block mb-2"></i> DATA_NOT_FOUND</div>';
+            container.innerHTML = '<div class="text-center bg-[#050505] rounded-lg border border-slate-800 text-slate-500 py-8 text-[9px] md:text-[10px] font-mono font-bold tracking-widest"><i class="fa-solid fa-ban text-base md:text-lg block mb-2"></i> DATA_NOT_FOUND</div>';
             return;
         }
         
@@ -476,18 +473,18 @@ const CevicheKernel = (function() {
         for (const [cat, val] of Object.entries(stats)) {
              const pct = val.total > 0 ? Math.round((val.sold / val.total) * 100) : 0;
              const div = document.createElement('div');
-             div.className = "mb-4 bg-[#050505] p-4 rounded-xl border border-slate-800 shadow-inner";
+             div.className = "mb-3 md:mb-4 bg-[#050505] p-3 md:p-4 rounded-xl border border-slate-800 shadow-inner";
              div.innerHTML = `
                 <div class="flex justify-between items-end mb-2">
-                    <span class="text-[10px] font-black text-slate-300 uppercase tracking-widest">${sanitizeHTML(cat)}</span>
+                    <span class="text-[9px] md:text-[10px] font-black text-slate-300 uppercase tracking-widest">${sanitizeHTML(cat)}</span>
                     <div class="text-right">
-                        <span class="font-mono text-emerald-400 font-bold text-sm leading-none">${val.sold}</span>
-                        <span class="text-[8px] text-slate-500 font-mono mx-1">/</span>
-                        <span class="font-mono text-slate-400 text-xs leading-none">${val.total}</span>
-                        <span class="text-[8px] text-brand-500 font-black ml-2 bg-brand-500/10 px-1 rounded">${pct}%</span>
+                        <span class="font-mono text-emerald-400 font-bold text-xs md:text-sm leading-none">${val.sold}</span>
+                        <span class="text-[7px] md:text-[8px] text-slate-500 font-mono mx-1">/</span>
+                        <span class="font-mono text-slate-400 text-[10px] md:text-xs leading-none">${val.total}</span>
+                        <span class="text-[7px] md:text-[8px] text-brand-500 font-black ml-1 md:ml-2 bg-brand-500/10 px-1 rounded">${pct}%</span>
                     </div>
                 </div>
-                <div class="w-full h-1.5 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
+                <div class="w-full h-1 md:h-1.5 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
                     <div class="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 transition-all duration-1000" style="width: ${pct}%"></div>
                 </div>
              `;
@@ -502,15 +499,11 @@ const CevicheKernel = (function() {
         const container = document.getElementById('stats-container');
         
         modal.classList.remove('hidden');
-        // Pequeño delay para permitir que el display:block se aplique antes de animar opacidad
-        requestAnimationFrame(() => {
-            modal.setAttribute('data-state', 'open');
-        });
+        requestAnimationFrame(() => modal.setAttribute('data-state', 'open'));
         document.body.style.overflow = 'hidden'; 
         
-        container.innerHTML = '<div class="text-center py-16"><i class="fa-solid fa-satellite-dish fa-spin text-brand-500 text-4xl mb-4"></i><p class="text-[10px] text-slate-500 font-mono tracking-widest">DESCIFRANDO PAQUETES...</p></div>';
+        container.innerHTML = '<div class="text-center py-10 md:py-16"><i class="fa-solid fa-satellite-dish fa-spin text-brand-500 text-3xl md:text-4xl mb-4"></i><p class="text-[9px] md:text-[10px] text-slate-500 font-mono tracking-widest">DESCIFRANDO PAQUETES...</p></div>';
         
-        // 🔒 AbortController para prevenir race conditions si el usuario clickea muy rápido
         if(STATE.abortController) STATE.abortController.abort();
         STATE.abortController = new AbortController();
 
@@ -530,19 +523,19 @@ const CevicheKernel = (function() {
             
             const statusBadge = document.getElementById('modal-status');
             if(data.active) {
-                statusBadge.textContent = "TRANSMITIENDO (LIVE)";
-                statusBadge.className = "px-2.5 py-1 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[9px] font-black uppercase tracking-widest mb-4 inline-block shadow-lg";
+                statusBadge.textContent = "LIVE";
+                statusBadge.className = "px-2 md:px-2.5 py-1 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[8px] md:text-[9px] font-black uppercase tracking-widest mb-2 md:mb-4 inline-block shadow-lg";
             } else {
-                statusBadge.textContent = "SUSPENDIDO (OFFLINE)";
-                statusBadge.className = "px-2.5 py-1 rounded bg-slate-800 text-slate-400 border border-slate-600 text-[9px] font-black uppercase tracking-widest mb-4 inline-block shadow-lg";
+                statusBadge.textContent = "OFFLINE";
+                statusBadge.className = "px-2 md:px-2.5 py-1 rounded bg-slate-800 text-slate-400 border border-slate-600 text-[8px] md:text-[9px] font-black uppercase tracking-widest mb-2 md:mb-4 inline-block shadow-lg";
             }
 
             document.getElementById('modal-img').src = data.poster_url || '';
             renderStatsUI(data.stats, container);
 
         } catch(e) {
-            if(e.name === 'AbortError') return; // Se ignoran cancelaciones intencionales
-            container.innerHTML = '<div class="bg-red-950/50 border border-red-500/30 p-5 rounded-xl text-center"><i class="fa-solid fa-triangle-exclamation text-red-500 text-2xl mb-2 block"></i><span class="text-xs font-mono text-red-200">El túnel de telemetría ha colapsado.</span></div>';
+            if(e.name === 'AbortError') return; 
+            container.innerHTML = '<div class="bg-red-950/50 border border-red-500/30 p-4 md:p-5 rounded-xl text-center"><i class="fa-solid fa-triangle-exclamation text-red-500 text-xl md:text-2xl mb-2 block"></i><span class="text-[10px] md:text-xs font-mono text-red-200">El túnel de telemetría colapsó.</span></div>';
         }
     };
 
@@ -552,11 +545,11 @@ const CevicheKernel = (function() {
         setTimeout(() => {
             modal.classList.add('hidden');
             document.body.style.overflow = '';
-        }, 300); // Sincronizado con duración CSS
+        }, 300);
         if(STATE.abortController) STATE.abortController.abort();
     };
 
-    // 🏗️ 6. GESTOR DE CREACIÓN Y EDICIÓN (Transaccional)
+    // 🏗️ GESTOR DE CREACIÓN Y EDICIÓN
     const initCreateModal = () => {
         const modal = document.getElementById('modal-edit-event');
         document.getElementById('edit-event-form').reset(); 
@@ -564,26 +557,26 @@ const CevicheKernel = (function() {
         document.getElementById('edit-id').value = ''; 
         document.getElementById('edit-active').checked = true; 
         
-        // Reset Selector
         const uploadRadio = document.querySelector('input[name="poster_method"][value="upload"]');
         if(uploadRadio) { uploadRadio.checked = true; togglePosterMethod(); }
         
-        document.getElementById('modal-edit-title').textContent = "Inyectar Nodo (Nuevo Evento)";
-        document.getElementById('btn-save-edit').innerHTML = '<i class="fa-solid fa-rocket"></i> Ejecutar Inyección';
+        document.getElementById('modal-edit-title').textContent = "Inyectar Nodo";
+        document.getElementById('btn-save-edit').innerHTML = '<i class="fa-solid fa-rocket"></i> Ejecutar';
         
         document.getElementById('stats-card').classList.add('hidden');
         document.getElementById('pricing-section').classList.add('hidden');
 
         modal.classList.remove('hidden');
         requestAnimationFrame(() => modal.setAttribute('data-state', 'open'));
+        document.body.style.overflow = 'hidden'; // Evitar scroll fondo en mobile
     };
 
     const fetchAndOpenEdit = async (id) => {
         const modal = document.getElementById('modal-edit-event');
         const priceBody = document.getElementById('pricing-table-body');
         
-        document.getElementById('modal-edit-title').textContent = "Modificar Atributos (Edición)";
-        document.getElementById('btn-save-edit').innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Consolidar en DB';
+        document.getElementById('modal-edit-title').textContent = "Modificar Atributos";
+        document.getElementById('btn-save-edit').innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Consolidar';
         
         document.getElementById('stats-card').classList.remove('hidden');
         document.getElementById('pricing-section').classList.remove('hidden');
@@ -593,7 +586,7 @@ const CevicheKernel = (function() {
 
         document.getElementById('stat-available').textContent = '-';
         document.getElementById('stat-progress').style.width = '0%';
-        priceBody.innerHTML = '<tr><td colspan="2" class="p-8 text-center text-xs font-mono text-brand-500"><i class="fa-solid fa-cog fa-spin text-xl block mb-2"></i> EXTRACCION DE TOPOLOGIA...</td></tr>';
+        priceBody.innerHTML = '<tr><td colspan="2" class="p-6 md:p-8 text-center text-[10px] md:text-xs font-mono text-brand-500"><i class="fa-solid fa-cog fa-spin text-lg md:text-xl block mb-2"></i> EXTRACCION DE TOPOLOGIA...</td></tr>';
         
         try {
             const res = await fetch(`/dashboard/events/${id}/edit/`);
@@ -611,18 +604,18 @@ const CevicheKernel = (function() {
                 document.getElementById('stat-available').textContent = data.stats.available;
                 document.getElementById('stat-sold').textContent = data.stats.sold;
                 document.getElementById('stat-total').textContent = data.stats.total;
-                document.getElementById('stat-occupancy').textContent = `${data.stats.occupancy}% Ocupación`;
+                document.getElementById('stat-occupancy').textContent = `${data.stats.occupancy}% Ocup`;
                 
                 setTimeout(() => { document.getElementById('stat-progress').style.width = `${data.stats.occupancy}%`; }, 150);
 
                 const availEl = document.getElementById('stat-available');
                 if (data.stats.available === 0) {
-                    availEl.className = "text-3xl font-mono font-bold text-red-500 drop-shadow-md"; 
-                    availEl.textContent = "SOLD OUT";
+                    availEl.className = "text-2xl md:text-3xl font-mono font-bold text-red-500 drop-shadow-md"; 
+                    availEl.textContent = "OUT";
                 } else if (data.stats.available < 20) {
-                    availEl.className = "text-3xl font-mono font-bold text-amber-400 drop-shadow-md";
+                    availEl.className = "text-2xl md:text-3xl font-mono font-bold text-amber-400 drop-shadow-md";
                 } else {
-                    availEl.className = "text-3xl font-mono font-bold text-emerald-400 drop-shadow-md";
+                    availEl.className = "text-2xl md:text-3xl font-mono font-bold text-emerald-400 drop-shadow-md";
                 }
             }
 
@@ -636,16 +629,16 @@ const CevicheKernel = (function() {
                     const tr = document.createElement('tr');
                     tr.className = "hover:bg-white/5 transition-colors group";
                     tr.innerHTML = `
-                        <td class="px-4 py-3 align-middle">
-                            <span class="bg-slate-800 text-white border border-slate-700 px-2.5 py-1 rounded text-[9px] font-black tracking-widest shadow-sm">${safeName}</span>
+                        <td class="px-3 md:px-4 py-2 md:py-3 align-middle">
+                            <span class="bg-slate-800 text-white border border-slate-700 px-2 py-1 md:px-2.5 md:py-1 rounded text-[8px] md:text-[9px] font-black tracking-widest shadow-sm">${safeName}</span>
                         </td>
-                        <td class="px-4 py-3">
-                            <div class="relative max-w-[180px] ml-auto">
-                                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500 font-bold text-xs">$</span>
+                        <td class="px-3 md:px-4 py-2 md:py-3">
+                            <div class="relative w-[120px] md:w-[160px] ml-auto">
+                                <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-emerald-500 font-bold text-[10px] md:text-xs">$</span>
                                 <input type="number" 
                                        name="prices[${safeCode}]" 
                                        value="${safePrice}" 
-                                       class="w-full bg-[#0b0b0e] border border-slate-700 rounded-md pl-7 pr-3 py-2.5 text-right text-white text-xs font-mono focus:border-emerald-500 outline-none transition-all placeholder:text-slate-700 focus:ring-1 focus:ring-emerald-500 group-hover:border-slate-500" 
+                                       class="w-full bg-[#0b0b0e] border border-slate-700 rounded-md pl-6 md:pl-7 pr-2 md:pr-3 py-2 md:py-2.5 text-right text-white text-[10px] md:text-xs font-mono focus:border-emerald-500 outline-none transition-all placeholder:text-slate-700 focus:ring-1 focus:ring-emerald-500 group-hover:border-slate-500" 
                                        placeholder="0.00" min="0" step="1000">
                             </div>
                         </td>
@@ -653,11 +646,12 @@ const CevicheKernel = (function() {
                     priceBody.appendChild(tr);
                 });
             } else {
-                priceBody.innerHTML = '<tr><td colspan="2" class="p-6 text-center text-[10px] uppercase font-black text-amber-500 tracking-widest bg-amber-500/10 border-t border-b border-amber-500/20"><i class="fa-solid fa-triangle-exclamation mr-2"></i> Topología ausente (Teatro sin zonas)</td></tr>';
+                priceBody.innerHTML = '<tr><td colspan="2" class="p-4 md:p-6 text-center text-[9px] md:text-[10px] uppercase font-black text-amber-500 tracking-widest bg-amber-500/10 border-t border-b border-amber-500/20"><i class="fa-solid fa-triangle-exclamation mr-1 md:mr-2"></i> Sin zonas</td></tr>';
             }
 
             modal.classList.remove('hidden');
             requestAnimationFrame(() => modal.setAttribute('data-state', 'open'));
+            document.body.style.overflow = 'hidden'; 
         } catch(e) {
             spawnToast("Violación de acceso al recuperar metadatos.", "error");
         }
@@ -666,28 +660,56 @@ const CevicheKernel = (function() {
     const closeEditUI = () => {
         const modal = document.getElementById('modal-edit-event');
         modal.setAttribute('data-state', 'closed');
-        setTimeout(() => modal.classList.add('hidden'), 300);
+        setTimeout(() => {
+            modal.classList.add('hidden');
+            document.body.style.overflow = '';
+        }, 300);
     };
 
-    // 📡 7. CONTROLADOR DE TRANSACCIONES FRONT-BACKEND (Mutex implementado)
+    // 🚨 PROTOCOLO DE ERRADICACIÓN DE NODOS (DELETE)
+    const execDelete = async (id) => {
+        if(!confirm("⚠️ ADVERTENCIA CRÍTICA: ¿Estás seguro de que deseas purgar este nodo? Esta acción es irreversible y destruirá los metadatos y ventas asociadas en Postgres.")) return;
+
+        if (STATE.isRequestPending) return;
+        STATE.isRequestPending = true;
+
+        try {
+            // Asegúrate de tener una URL/Vista en backend configurada para borrar el evento. Ejemplo: path('events/<uuid:pk>/delete/', delete_view...)
+            const res = await fetch(`/dashboard/events/${id}/delete/`, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+            });
+
+            if(res.ok) {
+                spawnToast("Nodo erradicado con éxito. Purga completa.", "success");
+                setTimeout(() => window.location.reload(), 1200);
+            } else {
+                throw new Error("Fallo en la purga del servidor.");
+            }
+        } catch(e) {
+            spawnToast(e.message, "error");
+            STATE.isRequestPending = false;
+        }
+    };
+
+    // 📡 CONTROLADOR DE TRANSACCIONES FRONT-BACKEND
     const bindFormEngine = () => {
         const form = document.getElementById('edit-event-form');
         if(!form) return;
 
         form.addEventListener('submit', async function(e) {
             e.preventDefault();
-            if (STATE.isRequestPending) return; // Mutex Lock: Bloquea doble envío accidental
+            if (STATE.isRequestPending) return;
             
             STATE.isRequestPending = true;
             const id = document.getElementById('edit-id').value;
             const btn = document.getElementById('btn-save-edit');
             const originalText = btn.innerHTML;
             
-            btn.innerHTML = '<i class="fa-solid fa-microchip fa-spin"></i> Compilando Paquetes...';
+            btn.innerHTML = '<i class="fa-solid fa-microchip fa-spin"></i> Compilando...';
             btn.disabled = true;
 
             const formData = new FormData(this); 
-            // Fix nativo para Checkboxes vacíos en HTML
             formData.set('active', document.getElementById('edit-active').checked);
 
             const targetUrl = id ? `/dashboard/events/${id}/edit/` : '/dashboard/events/create/';
@@ -704,7 +726,6 @@ const CevicheKernel = (function() {
                 if(res.ok) {
                     spawnToast(id ? "Transacción ACID Confirmada" : "Nuevo Nodo Creado Exitosamente");
                     closeEditUI();
-                    // Refresco seguro sin forzar caché total
                     setTimeout(() => window.location.reload(), 1200);
                 } else {
                     throw new Error(result.message || "Falla del Kernel Backend.");
@@ -713,20 +734,20 @@ const CevicheKernel = (function() {
                 spawnToast(e.message, "error");
                 btn.innerHTML = originalText;
                 btn.disabled = false;
-                STATE.isRequestPending = false; // Liberación del Mutex
+                STATE.isRequestPending = false; 
             } 
         });
     };
 
-    // ⌨️ 8. LISTENER GLOBAL OPTIMIZADO (Memory Leak Protection)
+    // ⌨️ LISTENER GLOBAL OPTIMIZADO
     const bindKeyboardEvents = () => {
         document.addEventListener('keydown', (e) => {
             if (e.key === "Escape") {
                 const modalDetails = document.getElementById('modal-details');
                 const modalEdit = document.getElementById('modal-edit-event');
                 
-                if (modalDetails.getAttribute('data-state') === 'open') closeDetailsUI();
-                if (modalEdit.getAttribute('data-state') === 'open') closeEditUI();
+                if (modalDetails && modalDetails.getAttribute('data-state') === 'open') closeDetailsUI();
+                if (modalEdit && modalEdit.getAttribute('data-state') === 'open') closeEditUI();
             }
         });
     };
@@ -737,44 +758,50 @@ const CevicheKernel = (function() {
         bindKeyboardEvents();
     };
 
-    // Al cargar el DOM de manera segura
     document.addEventListener("DOMContentLoaded", init);
 
-    // 🔓 EXPOSICIÓN DE APIS SEGURAS AL SCOPE GLOBAL (Solo lo necesario)
+    // 🔓 EXPOSICIÓN DE APIS SEGURAS
     return {
         togglePosterMethod: togglePosterMethod,
         openEventDetails: fetchDetails,
         closeDetails: closeDetailsUI,
         openCreateModal: initCreateModal,
         openEditModal: fetchAndOpenEdit,
-        closeEditModal: closeEditUI
+        closeEditModal: closeEditUI,
+        deleteEventNode: execDelete  // Expuesto método Delete
     };
 
-})(); // Ejecución Inmediata del Módulo
+})(); 
 </script>
 
 <style>
-    /* COMPONENTES DE INTERFAZ SCROLLBAR INVISIBLE */
-    .custom-scrollbar::-webkit-scrollbar { width: 3px; }
-    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-    .custom-scrollbar::-webkit-scrollbar-thumb { background: #ff6600; border-radius: 2px; }
+    /* Ocultar barra de scroll en móviles para limpieza visual */
+    @media (max-width: 768px) {
+        .custom-scrollbar::-webkit-scrollbar { display: none; }
+        .custom-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    }
+    @media (min-width: 769px) {
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #ff6600; border-radius: 4px; }
+    }
     
     .animate-fade-in-up { animation: fadeInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
     .animate-fade-in-down { animation: fadeInDown 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
     
     @keyframes fadeInUp { 
-        from { opacity: 0; transform: translateY(15px); } 
+        from { opacity: 0; transform: translateY(20px); } 
         to { opacity: 1; transform: translateY(0); } 
     }
     @keyframes fadeInDown { 
-        from { opacity: 0; transform: translateY(-15px); } 
+        from { opacity: 0; transform: translateY(-20px); } 
         to { opacity: 1; transform: translateY(0); } 
     }
     
     .glass-panel { 
         background: rgba(10, 10, 12, 0.85); 
-        backdrop-filter: blur(16px); 
-        -webkit-backdrop-filter: blur(16px);
+        backdrop-filter: blur(20px); 
+        -webkit-backdrop-filter: blur(20px);
     }
 </style>
 
