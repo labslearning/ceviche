@@ -25,14 +25,14 @@
                 extend: {
                     fontFamily: {
                         sans: ['Inter', 'sans-serif'],
-                        ui: ['Inter', 'sans-serif'], // Letra primaria para UI
-                        mono: ['JetBrains Mono', 'monospace'], // Letra para datos financieros/técnicos
+                        ui: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
                     },
                     colors: {
                         brand: {
-                            400: '#ff8833', // Neon Orange Claro
-                            500: '#ff6600', // Ceviche Orange
-                            600: '#e65c00', // Orange Profundo
+                            400: '#ff8833', 
+                            500: '#ff6600', 
+                            600: '#e65c00', 
                             900: '#4d1f00',
                         },
                         cyber: {
@@ -57,26 +57,18 @@
                 radial-gradient(circle at 15% 50%, rgba(255, 102, 0, 0.04), transparent 25%),
                 radial-gradient(circle at 85% 30%, rgba(99, 102, 241, 0.04), transparent 25%);
             background-attachment: fixed;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden; /* Controlado estrictamente por el Main */
         }
 
         .glass-panel {
-            background: rgba(10, 10, 14, 0.7);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border: 1px solid rgba(255, 255, 255, 0.03);
-            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
-        }
-
-        .cyber-border {
-            position: relative;
-        }
-        .cyber-border::after {
-            content: '';
-            position: absolute;
-            bottom: 0; left: 0;
-            width: 100%; height: 1px;
-            background: linear-gradient(90deg, transparent, var(--primary, #ff6600), transparent);
-            opacity: 0.3;
+            background: rgba(10, 10, 14, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
         }
 
         /* SCROLLBAR INVISIBLE & FUTURISTA */
@@ -85,141 +77,191 @@
         ::-webkit-scrollbar-thumb { background: #333344; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #ff6600; }
         
-        /* UTILIDAD PARA EVITAR SELECCIÓN ACCIDENTAL EN MÓVILES */
         .no-select { -webkit-user-select: none; user-select: none; }
+
+        /* DROPDOWN ANIMATIONS */
+        .dropdown-menu {
+            transform-origin: top;
+            transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.2s;
+            opacity: 0;
+            visibility: hidden;
+            transform: scaleY(0.95) translateY(-5px);
+        }
+        .group:hover .dropdown-menu,
+        .dropdown-menu.active {
+            opacity: 1;
+            visibility: visible;
+            transform: scaleY(1) translateY(0);
+        }
     </style>
 </head>
-<body class="text-slate-200 font-sans antialiased selection:bg-brand-500 selection:text-white overflow-hidden h-screen w-screen flex relative">
+<body class="text-slate-200 font-sans antialiased selection:bg-brand-500 selection:text-white">
 
-    <div id="mobile-backdrop" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-40 hidden opacity-0 transition-opacity duration-300 md:hidden" aria-hidden="true"></div>
-
-    <aside id="sidebar-core" class="fixed inset-y-0 left-0 z-50 w-72 flex-shrink-0 flex flex-col bg-[#050507]/95 backdrop-blur-2xl border-r border-cyber-border transform -translate-x-full transition-transform duration-300 ease-out md:relative md:translate-x-0 md:flex shadow-[20px_0_50px_rgba(0,0,0,0.5)] md:shadow-none">
+    <header class="h-16 w-full glass-panel z-[9000] shrink-0 relative px-4 md:px-6 flex items-center justify-between pt-[var(--sat)]">
         
-        <div class="h-20 flex items-center px-6 border-b border-cyber-border cyber-border justify-between md:justify-start shrink-0">
+        <div class="flex items-center gap-6">
             <div class="flex items-center gap-3">
                 <div class="w-8 h-8 rounded bg-gradient-to-br from-brand-500 to-amber-500 flex items-center justify-center shadow-[0_0_15px_rgba(255,102,0,0.4)]">
                     <i class="fa-solid fa-bolt text-white text-sm"></i>
                 </div>
-                <div>
-                    <span class="text-xl font-black tracking-tighter text-white leading-none block font-ui">Ceviche<span class="text-brand-500">OS</span></span>
-                    <span class="text-[8px] font-mono text-brand-400 uppercase tracking-widest block">v2.0 Kernel</span>
+                <div class="flex flex-col">
+                    <span class="text-lg font-black tracking-tighter text-white leading-none block font-ui">Ceviche<span class="text-brand-500">OS</span></span>
                 </div>
             </div>
-            <button id="close-sidebar-btn" class="md:hidden text-slate-500 hover:text-white w-8 h-8 flex items-center justify-center rounded-md hover:bg-white/5 transition-colors focus:outline-none">
-                <i class="fa-solid fa-xmark text-lg"></i>
-            </button>
+
+            <nav class="hidden md:flex items-center gap-1 ml-4 bg-white/5 border border-white/5 rounded-lg p-1 shadow-inner">
+                
+                <a href="{% url 'dashboard:home' %}" class="px-4 py-2 rounded-md transition-all text-xs font-bold tracking-wide flex items-center gap-2 {% if request.resolver_match.url_name == 'home' %}bg-white/10 text-brand-400 shadow-sm{% else %}text-slate-400 hover:text-white hover:bg-white/5{% endif %}">
+                    <i class="fa-solid fa-chart-pie"></i> Telemetría
+                </a>
+
+                <a href="{% url 'dashboard:order_list' %}" class="px-4 py-2 rounded-md transition-all text-xs font-bold tracking-wide flex items-center gap-2 {% if 'finance' in request.path or 'orders' in request.path %}bg-white/10 text-brand-400 shadow-sm{% else %}text-slate-400 hover:text-white hover:bg-white/5{% endif %}">
+                    <i class="fa-solid fa-wallet"></i> Finanzas
+                </a>
+
+                <div class="relative group">
+                    <button type="button" class="px-4 py-2 rounded-md transition-all text-xs font-bold tracking-wide flex items-center gap-2 {% if 'theater' in request.path or 'events' in request.path %}bg-white/10 text-brand-400 shadow-sm{% else %}text-slate-400 hover:text-white hover:bg-white/5{% endif %}">
+                        <i class="fa-solid fa-database"></i> Gestión <i class="fa-solid fa-chevron-down text-[9px] ml-1 opacity-50 group-hover:rotate-180 transition-transform"></i>
+                    </button>
+                    
+                    <div class="dropdown-menu absolute top-full left-0 mt-1 w-56 bg-[#0a0a0c]/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-[0_20px_40px_rgba(0,0,0,0.8)] p-2 z-[9999]">
+                        <a href="{% url 'dashboard:theater_editor' %}" class="flex items-center gap-3 p-3 rounded-lg hover:bg-brand-500/10 hover:text-brand-400 text-slate-300 transition-colors group/item">
+                            <div class="w-8 h-8 rounded-md bg-white/5 border border-white/5 flex items-center justify-center group-hover/item:border-brand-500/30 group-hover/item:bg-brand-500/20">
+                                <i class="fa-solid fa-layer-group text-xs"></i>
+                            </div>
+                            <div>
+                                <span class="block text-xs font-bold">Topología CAD</span>
+                                <span class="block text-[9px] font-mono text-slate-500">Editor de Teatros</span>
+                            </div>
+                        </a>
+                        <div class="h-px w-full bg-white/5 my-1"></div>
+                        <a href="{% url 'dashboard:event_list' %}" class="flex items-center gap-3 p-3 rounded-lg hover:bg-brand-500/10 hover:text-brand-400 text-slate-300 transition-colors group/item">
+                            <div class="w-8 h-8 rounded-md bg-white/5 border border-white/5 flex items-center justify-center group-hover/item:border-brand-500/30 group-hover/item:bg-brand-500/20">
+                                <i class="fa-solid fa-calendar-days text-xs"></i>
+                            </div>
+                            <div>
+                                <span class="block text-xs font-bold">Matriz de Eventos</span>
+                                <span class="block text-[9px] font-mono text-slate-500">Control de Cartelera</span>
+                            </div>
+                        </a>
+                    </div>
+                </div>
+
+                <div class="w-px h-5 bg-white/10 mx-2"></div>
+
+                <a href="/" target="_blank" rel="noopener noreferrer" class="px-4 py-2 rounded-md transition-all text-xs font-bold tracking-wide flex items-center gap-2 text-slate-400 hover:text-brand-400 hover:bg-brand-500/10 group/link">
+                    <i class="fa-solid fa-arrow-up-right-from-square group-hover/link:translate-x-0.5 group-hover/link:-translate-y-0.5 transition-transform"></i> Exterior
+                </a>
+            </nav>
         </div>
 
-        <nav class="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto custom-scrollbar">
+        <div class="flex items-center gap-4">
             
-            <p class="px-3 text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
-                <i class="fa-solid fa-microchip text-slate-600"></i> Núcleo Principal
-            </p>
+            <div class="relative group">
+                <button type="button" class="flex items-center gap-3 focus:outline-none rounded-lg hover:bg-white/5 p-1 pr-3 transition-colors border border-transparent hover:border-white/10">
+                    <div class="w-8 h-8 rounded-md bg-gradient-to-tr from-brand-600 to-purple-600 flex items-center justify-center text-white font-black text-[10px] shadow-inner relative overflow-hidden">
+                        <div class="absolute inset-0 bg-black/20"></div>
+                        <span class="relative z-10">{{ request.user.username|slice:":2"|upper|force_escape }}</span>
+                    </div>
+                    <div class="hidden md:flex flex-col text-left">
+                        <span class="text-xs font-bold text-white leading-tight truncate max-w-[100px]">{{ request.user.username|force_escape }}</span>
+                        <span class="text-[9px] text-emerald-400 font-mono flex items-center gap-1"><span class="w-1 h-1 rounded-full bg-emerald-500 animate-pulse"></span> Seguro</span>
+                    </div>
+                    <i class="fa-solid fa-chevron-down text-[9px] text-slate-500 hidden md:block opacity-50 group-hover:rotate-180 transition-transform"></i>
+                </button>
+
+                <div class="dropdown-menu absolute top-full right-0 mt-2 w-48 bg-[#0a0a0c]/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-[0_20px_40px_rgba(0,0,0,0.8)] p-2 z-[9999]">
+                    <div class="p-3 border-b border-white/5 mb-1 md:hidden">
+                        <span class="text-xs font-bold text-white block">{{ request.user.username|force_escape }}</span>
+                        <span class="text-[9px] text-slate-500 font-mono block">Administrador</span>
+                    </div>
+                    <form action="{% url 'dashboard:logout' %}" method="post" class="m-0">
+                        {% csrf_token %}
+                        <button type="submit" class="w-full flex items-center gap-3 p-2.5 rounded-lg text-red-400 hover:bg-red-500/10 hover:text-red-500 transition-colors text-xs font-bold text-left">
+                            <i class="fa-solid fa-power-off"></i> Abortar Sesión
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <button id="mobile-menu-btn" onclick="SystemCore.toggleMobileMenu()" class="md:hidden w-10 h-10 flex flex-col items-center justify-center gap-1.5 text-white bg-white/5 rounded-lg border border-white/10 hover:bg-brand-500/20 hover:border-brand-500/50 hover:text-brand-400 transition-all focus:outline-none">
+                <span class="w-5 h-0.5 bg-current rounded-full transition-transform origin-center"></span>
+                <span class="w-4 h-0.5 bg-current rounded-full mr-1 transition-opacity"></span>
+                <span class="w-5 h-0.5 bg-current rounded-full transition-transform origin-center"></span>
+            </button>
+        </div>
+    </header>
+
+    <div id="mobile-dropdown-menu" class="fixed inset-x-0 top-16 bg-[#0a0a0c]/98 backdrop-blur-3xl border-b border-white/10 z-[8500] transform -translate-y-full opacity-0 transition-all duration-300 ease-[cubic-bezier(0.19,1,0.22,1)] shadow-[0_20px_50px_rgba(0,0,0,0.8)] md:hidden pointer-events-none">
+        <nav class="p-4 space-y-2 max-h-[80vh] overflow-y-auto pb-[var(--sab)] custom-scrollbar">
             
-            <a href="{% url 'dashboard:home' %}" 
-               class="flex items-center px-4 py-3.5 rounded-xl transition-all group {% if request.resolver_match.url_name == 'home' %}bg-brand-600/10 border border-brand-500/30 text-brand-400 shadow-[inset_0_0_20px_rgba(255,102,0,0.1)]{% else %}text-slate-400 hover:bg-white/5 hover:text-white border border-transparent{% endif %}">
-                <i class="fa-solid fa-chart-pie w-7 text-center transition-transform group-hover:scale-110 {% if request.resolver_match.url_name == 'home' %}text-brand-500{% endif %}"></i>
-                <span class="font-bold text-sm tracking-wide">Telemetría Global</span>
+            <p class="px-2 text-[9px] font-black text-slate-500 uppercase tracking-widest mt-2 mb-2"><i class="fa-solid fa-microchip mr-1"></i> Núcleo</p>
+            
+            <a href="{% url 'dashboard:home' %}" class="flex items-center gap-3 p-3.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'home' %}bg-brand-500/10 border border-brand-500/30 text-brand-400{% else %}text-slate-300 hover:bg-white/5{% endif %}">
+                <div class="w-8 h-8 rounded border border-white/5 flex items-center justify-center bg-black/40"><i class="fa-solid fa-chart-pie text-sm"></i></div>
+                <span class="font-bold text-sm tracking-wide">Telemetría</span>
             </a>
 
-            <a href="{% url 'dashboard:order_list' %}" 
-               class="flex items-center px-4 py-3.5 rounded-xl transition-all group {% if 'finance' in request.path or 'orders' in request.path %}bg-brand-600/10 border border-brand-500/30 text-brand-400 shadow-[inset_0_0_20px_rgba(255,102,0,0.1)]{% else %}text-slate-400 hover:bg-white/5 hover:text-white border border-transparent{% endif %}">
-                <i class="fa-solid fa-wallet w-7 text-center transition-transform group-hover:scale-110 {% if 'finance' in request.path or 'orders' in request.path %}text-brand-500{% endif %}"></i>
-                <span class="font-bold text-sm tracking-wide">Flujo Financiero</span>
+            <a href="{% url 'dashboard:order_list' %}" class="flex items-center gap-3 p-3.5 rounded-xl transition-all {% if 'finance' in request.path or 'orders' in request.path %}bg-brand-500/10 border border-brand-500/30 text-brand-400{% else %}text-slate-300 hover:bg-white/5{% endif %}">
+                <div class="w-8 h-8 rounded border border-white/5 flex items-center justify-center bg-black/40"><i class="fa-solid fa-wallet text-sm"></i></div>
+                <span class="font-bold text-sm tracking-wide">Finanzas</span>
             </a>
 
-            <p class="px-3 text-[10px] font-black text-slate-500 uppercase tracking-widest mt-8 mb-3 flex items-center gap-2">
-                <i class="fa-solid fa-database text-slate-600"></i> Gestión de Nodos
-            </p>
+            <p class="px-2 text-[9px] font-black text-slate-500 uppercase tracking-widest mt-6 mb-2"><i class="fa-solid fa-database mr-1"></i> Gestión</p>
 
-            <a href="{% url 'dashboard:theater_editor' %}" 
-               class="flex items-center px-4 py-3.5 rounded-xl transition-all group {% if 'theater' in request.path %}bg-brand-600/10 border border-brand-500/30 text-brand-400 shadow-[inset_0_0_20px_rgba(255,102,0,0.1)]{% else %}text-slate-400 hover:bg-white/5 hover:text-white border border-transparent{% endif %}">
-                <i class="fa-solid fa-layer-group w-7 text-center transition-transform group-hover:scale-110 {% if 'theater' in request.path %}text-brand-500{% endif %}"></i>
-                <span class="font-bold text-sm tracking-wide">Topología (Teatros)</span>
+            <a href="{% url 'dashboard:theater_editor' %}" class="flex items-center gap-3 p-3.5 rounded-xl transition-all {% if 'theater' in request.path %}bg-brand-500/10 border border-brand-500/30 text-brand-400{% else %}text-slate-300 hover:bg-white/5{% endif %}">
+                <div class="w-8 h-8 rounded border border-white/5 flex items-center justify-center bg-black/40"><i class="fa-solid fa-layer-group text-sm"></i></div>
+                <div>
+                    <span class="block font-bold text-sm tracking-wide">Topología CAD</span>
+                    <span class="block text-[10px] font-mono text-slate-500 mt-0.5">Editor de Teatros</span>
+                </div>
             </a>
             
-            <a href="{% url 'dashboard:event_list' %}" 
-               class="flex items-center px-4 py-3.5 rounded-xl transition-all group {% if 'events' in request.path %}bg-brand-600/10 border border-brand-500/30 text-brand-400 shadow-[inset_0_0_20px_rgba(255,102,0,0.1)]{% else %}text-slate-400 hover:bg-white/5 hover:text-white border border-transparent{% endif %}">
-                <i class="fa-solid fa-calendar-days w-7 text-center transition-transform group-hover:scale-110 {% if 'events' in request.path %}text-brand-500{% endif %}"></i>
-                <span class="font-bold text-sm tracking-wide">Matriz de Eventos</span>
+            <a href="{% url 'dashboard:event_list' %}" class="flex items-center gap-3 p-3.5 rounded-xl transition-all {% if 'events' in request.path %}bg-brand-500/10 border border-brand-500/30 text-brand-400{% else %}text-slate-300 hover:bg-white/5{% endif %}">
+                <div class="w-8 h-8 rounded border border-white/5 flex items-center justify-center bg-black/40"><i class="fa-solid fa-calendar-days text-sm"></i></div>
+                <div>
+                    <span class="block font-bold text-sm tracking-wide">Matriz de Eventos</span>
+                    <span class="block text-[10px] font-mono text-slate-500 mt-0.5">Catálogo y Precios</span>
+                </div>
             </a>
-            
-            <p class="px-3 text-[10px] font-black text-slate-500 uppercase tracking-widest mt-8 mb-3 flex items-center gap-2">
-                <i class="fa-solid fa-globe text-slate-600"></i> Exterior
-            </p>
-            
-            <a href="/" target="_blank" rel="noopener noreferrer" class="flex items-center px-4 py-3.5 rounded-xl text-slate-400 hover:bg-brand-500/10 hover:border-brand-500/30 hover:text-brand-400 border border-transparent transition-all group">
-                <i class="fa-solid fa-arrow-up-right-from-square w-7 text-center transition-transform group-hover:translate-x-1 group-hover:-translate-y-1"></i>
-                <span class="font-bold text-sm tracking-wide">Desplegar Portal</span>
+
+            <p class="px-2 text-[9px] font-black text-slate-500 uppercase tracking-widest mt-6 mb-2"><i class="fa-solid fa-globe mr-1"></i> Exterior</p>
+
+            <a href="/" target="_blank" rel="noopener noreferrer" class="flex items-center gap-3 p-3.5 rounded-xl text-slate-400 hover:text-white border border-transparent bg-white/5">
+                <div class="w-8 h-8 rounded flex items-center justify-center"><i class="fa-solid fa-arrow-up-right-from-square text-sm"></i></div>
+                <span class="font-bold text-sm tracking-wide">Desplegar Portal Público</span>
             </a>
         </nav>
+    </div>
 
-        <div class="p-4 border-t border-cyber-border bg-black/20 shrink-0">
-            <div class="flex items-center gap-3 bg-white/5 p-2.5 rounded-xl border border-white/5">
-                <div class="w-10 h-10 rounded-lg bg-gradient-to-tr from-brand-600 to-purple-600 flex items-center justify-center text-white font-black text-sm shadow-inner relative overflow-hidden">
-                    <div class="absolute inset-0 bg-black/20"></div>
-                    <span class="relative z-10">{{ request.user.username|slice:":2"|upper|force_escape }}</span>
-                </div>
-                <div class="flex-1 min-w-0">
-                    <p class="text-sm font-black text-white truncate font-ui tracking-tight">{{ request.user.username|force_escape }}</p>
-                    <p class="text-[9px] font-mono text-emerald-400 truncate tracking-widest flex items-center gap-1.5"><i class="fa-solid fa-circle text-[5px] animate-pulse"></i> CONEXIÓN SEGURA</p>
-                </div>
-                <form action="{% url 'dashboard:logout' %}" method="post" class="m-0">
-                    {% csrf_token %}
-                    <button type="submit" class="w-9 h-9 rounded-md bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white border border-red-500/20 transition-all flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-red-500" title="Abortar Sesión">
-                        <i class="fa-solid fa-power-off"></i>
-                    </button>
-                </form>
-            </div>
-        </div>
-    </aside>
-
-    <main class="flex-1 flex flex-col h-full relative overflow-hidden bg-transparent">
-        
-        <header class="md:hidden h-16 glass-panel border-b border-cyber-border flex items-center justify-between px-4 sticky top-0 z-30 shrink-0 shadow-lg">
-            <div class="flex items-center gap-2">
-                <div class="w-6 h-6 rounded bg-gradient-to-br from-brand-500 to-amber-500 flex items-center justify-center shadow-[0_0_10px_rgba(255,102,0,0.5)]">
-                    <i class="fa-solid fa-bolt text-white text-[10px]"></i>
-                </div>
-                <span class="font-black text-white text-lg tracking-tighter">Ceviche<span class="text-brand-500">OS</span></span>
-            </div>
+    <main id="main-content" class="flex-1 w-full relative overflow-y-auto custom-scrollbar bg-transparent pb-[var(--sab)] z-0">
+        <div class="p-4 sm:p-6 md:p-8 lg:p-10 max-w-[1800px] mx-auto w-full space-y-6 md:space-y-8">
             
-            <button id="open-sidebar-btn" class="w-10 h-10 flex flex-col items-center justify-center gap-1.5 text-white bg-white/5 rounded-lg border border-white/10 hover:bg-brand-500/20 hover:border-brand-500/50 hover:text-brand-400 transition-all focus:outline-none focus:ring-2 focus:ring-brand-500">
-                <span class="w-5 h-0.5 bg-current rounded-full"></span>
-                <span class="w-4 h-0.5 bg-current rounded-full mr-1"></span>
-                <span class="w-5 h-0.5 bg-current rounded-full"></span>
-            </button>
-        </header>
-
-        <div class="flex-1 overflow-y-auto custom-scrollbar relative z-10 w-full">
-            <div class="p-4 sm:p-6 md:p-8 lg:p-10 max-w-[1600px] mx-auto w-full space-y-6 md:space-y-8">
-                
-                {% if messages %}
-                    <div class="space-y-3 mb-6">
-                        {% for message in messages %}
-                        <div class="p-4 rounded-xl text-sm font-bold flex items-center gap-3 backdrop-blur-md animate-fade-in-down shadow-lg
-                            {% if message.tags == 'error' %}bg-red-950/80 text-red-100 border border-red-500/40 shadow-[0_0_15px_rgba(239,68,68,0.2)]
-                            {% elif message.tags == 'success' %}bg-emerald-950/80 text-emerald-100 border border-emerald-500/40 shadow-[0_0_15px_rgba(16,185,129,0.2)]
-                            {% else %}bg-brand-900/80 text-brand-100 border border-brand-500/40 shadow-[0_0_15px_rgba(99,102,241,0.2)]{% endif %}">
-                            
-                            {% if message.tags == 'error' %}<i class="fa-solid fa-skull-crossbones text-xl text-red-500"></i>
-                            {% elif message.tags == 'success' %}<i class="fa-solid fa-shield-check text-xl text-emerald-500"></i>
-                            {% else %}<i class="fa-solid fa-circle-info text-xl text-brand-500"></i>{% endif %}
-                            
-                            <span class="flex-1 tracking-wide">{{ message|force_escape }}</span>
-                        </div>
-                        {% endfor %}
+            {% if messages %}
+                <div class="space-y-3 mb-6 relative z-[5000]">
+                    {% for message in messages %}
+                    <div class="p-4 rounded-xl text-sm font-bold flex items-center gap-3 backdrop-blur-xl animate-fade-in-down shadow-2xl
+                        {% if message.tags == 'error' %}bg-red-950/90 text-red-100 border border-red-500/40 shadow-[0_0_20px_rgba(239,68,68,0.3)]
+                        {% elif message.tags == 'success' %}bg-emerald-950/90 text-emerald-100 border border-emerald-500/40 shadow-[0_0_20px_rgba(16,185,129,0.3)]
+                        {% else %}bg-brand-900/90 text-brand-100 border border-brand-500/40 shadow-[0_0_20px_rgba(249,115,22,0.3)]{% endif %}">
+                        
+                        {% if message.tags == 'error' %}<i class="fa-solid fa-skull-crossbones text-xl text-red-500"></i>
+                        {% elif message.tags == 'success' %}<i class="fa-solid fa-shield-check text-xl text-emerald-500"></i>
+                        {% else %}<i class="fa-solid fa-circle-info text-xl text-brand-500"></i>{% endif %}
+                        
+                        <span class="flex-1 tracking-wide">{{ message|force_escape }}</span>
                     </div>
-                {% endif %}
+                    {% endfor %}
+                </div>
+            {% endif %}
 
-                {% block content %}
-                {% endblock %}
-                
-            </div>
+            {% block content %}
+            {% endblock %}
             
-            <div class="mt-auto py-6 text-center border-t border-white/5 mx-4 md:mx-10 opacity-50 no-select">
-                <p class="text-[10px] font-mono text-slate-500 uppercase tracking-widest"><i class="fa-solid fa-shield-halved mr-1"></i> Ceviche OS Kernel v2.0 • Infraestructura Segura</p>
-            </div>
+        </div>
+        
+        <div class="mt-auto py-6 text-center border-t border-white/5 mx-4 md:mx-10 opacity-40 no-select">
+            <p class="text-[9px] font-mono text-slate-500 uppercase tracking-widest"><i class="fa-solid fa-shield-halved mr-1"></i> Ceviche OS Kernel v3.0 • Criptografía y Logística</p>
         </div>
     </main>
 
@@ -227,56 +269,67 @@
         const SystemCore = (function() {
             'use strict';
 
-            const sidebar = document.getElementById('sidebar-core');
-            const backdrop = document.getElementById('mobile-backdrop');
-            const openBtn = document.getElementById('open-sidebar-btn');
-            const closeBtn = document.getElementById('close-sidebar-btn');
+            const mobileMenu = document.getElementById('mobile-dropdown-menu');
+            const hamburgerBtn = document.getElementById('mobile-menu-btn');
+            const mainContent = document.getElementById('main-content');
             let isMenuOpen = false;
 
-            // 🚀 MOTOR DE DESPLIEGUE MOBILE
-            const toggleSidebar = (forceClose = false) => {
-                if (window.innerWidth >= 768) return; // Solo ejecuta en móviles
-                
+            // 🚀 MOTOR DE MENÚ DESPLEGABLE (MOBILE)
+            const toggleMobileMenu = (forceClose = false) => {
                 isMenuOpen = forceClose ? false : !isMenuOpen;
                 
                 if (isMenuOpen) {
-                    sidebar.classList.remove('-translate-x-full');
+                    // Abrir menú
+                    mobileMenu.classList.remove('-translate-y-full', 'opacity-0', 'pointer-events-none');
+                    // Animar botón hamburguesa a una "X"
+                    const spans = hamburgerBtn.querySelectorAll('span');
+                    spans[0].style.transform = 'translateY(8px) rotate(45deg)';
+                    spans[1].style.opacity = '0';
+                    spans[2].style.transform = 'translateY(-8px) rotate(-45deg)';
+                    hamburgerBtn.classList.add('bg-brand-500/20', 'border-brand-500/50', 'text-brand-400');
                     
-                    backdrop.classList.remove('hidden');
-                    // Forzar reflow para que la opacidad anime correctamente
-                    void backdrop.offsetWidth; 
-                    backdrop.classList.remove('opacity-0');
-                    
-                    document.body.style.overflow = 'hidden'; // Evitar scroll de fondo
+                    // Desenfoque del canvas principal para enfocar atención
+                    mainContent.style.filter = 'blur(8px)';
+                    mainContent.style.pointerEvents = 'none';
+                    document.body.style.overflow = 'hidden';
                 } else {
-                    sidebar.classList.add('-translate-x-full');
-                    backdrop.classList.add('opacity-0');
+                    // Cerrar menú
+                    mobileMenu.classList.add('-translate-y-full', 'opacity-0', 'pointer-events-none');
+                    // Restaurar hamburguesa
+                    const spans = hamburgerBtn.querySelectorAll('span');
+                    spans[0].style.transform = 'translateY(0) rotate(0)';
+                    spans[1].style.opacity = '1';
+                    spans[2].style.transform = 'translateY(0) rotate(0)';
+                    hamburgerBtn.classList.remove('bg-brand-500/20', 'border-brand-500/50', 'text-brand-400');
                     
-                    setTimeout(() => {
-                        backdrop.classList.add('hidden');
-                    }, 300); // Igual a duration-300 de Tailwind
-                    
-                    document.body.style.overflow = ''; 
+                    // Restaurar canvas
+                    mainContent.style.filter = 'none';
+                    mainContent.style.pointerEvents = 'auto';
+                    document.body.style.overflow = '';
                 }
             };
 
             // 🛡️ EVENT LISTENERS BLINDADOS
             const bindEvents = () => {
-                if(openBtn) openBtn.addEventListener('click', () => toggleSidebar());
-                if(closeBtn) closeBtn.addEventListener('click', () => toggleSidebar(true));
-                if(backdrop) backdrop.addEventListener('click', () => toggleSidebar(true));
-                
                 // Accesibilidad y prevención de Memory Leaks
                 document.addEventListener('keydown', (e) => {
-                    if (e.key === 'Escape' && isMenuOpen) {
-                        toggleSidebar(true);
+                    if (e.key === 'Escape') {
+                        if(isMenuOpen) toggleMobileMenu(true);
                     }
                 });
 
-                // Auto-cierre si se rota la pantalla a desktop
+                // Cierre automático si se rota la pantalla a monitor
                 window.addEventListener('resize', () => {
                     if (window.innerWidth >= 768 && isMenuOpen) {
-                        toggleSidebar(true);
+                        toggleMobileMenu(true);
+                    }
+                });
+
+                // Cierre al tocar el main difuminado
+                mainContent.addEventListener('click', (e) => {
+                    if(isMenuOpen) {
+                        e.preventDefault();
+                        toggleMobileMenu(true);
                     }
                 });
             };
@@ -284,8 +337,9 @@
             // Iniciar Kernel al cargar DOM
             document.addEventListener("DOMContentLoaded", bindEvents);
 
+            // Exposición pública de API
             return {
-                closeMenu: () => toggleSidebar(true)
+                toggleMobileMenu: toggleMobileMenu
             };
         })();
     </script>

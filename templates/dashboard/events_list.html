@@ -271,6 +271,18 @@
 
         <div class="p-4 md:p-6 overflow-y-auto custom-scrollbar flex-1 bg-[#0b0b0e] relative z-10 pb-24 md:pb-6">
             
+            <div id="zero-state-alert" class="hidden mb-6 bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 md:p-5 relative overflow-hidden shadow-inner">
+                <div class="absolute top-0 left-0 w-1 h-full bg-amber-500 shadow-[0_0_10px_#f59e0b]"></div>
+                <div class="flex items-start gap-4 relative z-10">
+                    <i class="fa-solid fa-triangle-exclamation text-2xl text-amber-500"></i>
+                    <div>
+                        <h4 class="text-white font-bold text-sm md:text-base">Malla de Teatros Vacía</h4>
+                        <p class="text-slate-400 text-[10px] md:text-xs mt-1">No hay recintos físicos registrados en la base de datos. Debes inicializar un Teatro antes de poder inyectar eventos.</p>
+                        <button onclick="window.location.href='{% url 'dashboard:theater_editor' %}'" type="button" class="mt-3 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-black font-bold text-[10px] uppercase tracking-widest rounded-lg shadow-lg shadow-amber-500/20 transition-all">Ir al Venue Hub</button>
+                    </div>
+                </div>
+            </div>
+
             <div id="stats-card" class="mb-6 md:mb-8 bg-[#050505] border border-slate-800 rounded-xl p-4 md:p-5 relative overflow-hidden shadow-inner">
                 <div class="absolute top-0 left-0 w-1 h-full bg-brand-500 shadow-[0_0_10px_#ff6600]"></div>
                 
@@ -300,6 +312,17 @@
             <form id="edit-event-form" class="space-y-5 md:space-y-6" enctype="multipart/form-data">
                 <input type="hidden" id="edit-id" name="id"> 
                 
+                <div id="venue-selector-container" class="space-y-1">
+                    <label class="block text-[8px] md:text-[9px] uppercase font-black tracking-widest text-brand-400"><i class="fa-solid fa-map-location-dot mr-1"></i> Recinto / Matriz Física</label>
+                    <div class="relative">
+                        <i class="fa-solid fa-building absolute left-3 md:left-4 top-1/2 -translate-y-1/2 text-slate-500 text-sm md:text-base pointer-events-none"></i>
+                        <select id="edit-venue" name="venue_id" required class="w-full bg-[#050505] border border-slate-700/80 rounded-lg pl-9 md:pl-11 pr-4 py-3 md:py-3.5 text-white text-sm focus:border-brand-500 outline-none transition-all focus:ring-2 focus:ring-brand-500/20 font-bold appearance-none cursor-pointer shadow-inner">
+                            <option value="" disabled selected>Cargando clúster de teatros...</option>
+                        </select>
+                        <i class="fa-solid fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 text-xs pointer-events-none"></i>
+                    </div>
+                </div>
+
                 <div class="space-y-1">
                     <label class="block text-[8px] md:text-[9px] uppercase font-black tracking-widest text-slate-500">Identificador Público</label>
                     <input type="text" id="edit-name" name="name" required autocomplete="off" spellcheck="false"
@@ -374,7 +397,7 @@
                                 </tr>
                             </thead>
                             <tbody id="pricing-table-body" class="divide-y divide-slate-800/50">
-                                </tbody>
+                            </tbody>
                         </table>
                     </div>
                 </div>
@@ -399,7 +422,7 @@
                 Abortar
             </button>
             <button type="submit" form="edit-event-form" id="btn-save-edit" class="flex-1 md:flex-none px-6 md:px-8 py-3 md:py-2.5 rounded-lg bg-brand-600 hover:bg-brand-500 text-white text-[9px] md:text-[10px] font-black uppercase tracking-widest shadow-[0_0_15px_rgba(255,102,0,0.4)] transition-all flex items-center justify-center gap-2 cursor-pointer focus:ring-2 focus:ring-brand-500 outline-none border border-brand-400/50">
-                </button>
+            </button>
         </div>
     </div>
 </div>
@@ -410,21 +433,19 @@
 const CevicheKernel = (function() {
     'use strict';
 
-    // 🔒 PROTECCIÓN DE MEMORIA Y ESTADO
     const STATE = {
         isRequestPending: false,
-        abortController: null
+        abortController: null,
+        venues: [] // Memoria caché de teatros
     };
     Object.seal(STATE);
 
-    // 🛡️ SANITIZADOR CRIPTOGRÁFICO DE DOM
     const sanitizeHTML = (dirtyString) => {
         if (typeof dirtyString !== 'string') return '';
         const doc = new DOMParser().parseFromString(dirtyString, 'text/html');
         return doc.body.textContent || "";
     };
 
-    // 🍞 SUBSISTEMA DE TOASTS VISUALES
     const spawnToast = (msg, type = 'success') => {
         const t = document.createElement('div');
         const isErr = type === 'error';
@@ -440,7 +461,6 @@ const CevicheKernel = (function() {
         }, 4000);
     };
 
-    // 🚀 LÓGICA DE ALTERNANCIA (PÓSTER)
     const togglePosterMethod = () => {
         const methodInput = document.querySelector('input[name="poster_method"]:checked');
         if(!methodInput) return;
@@ -462,7 +482,6 @@ const CevicheKernel = (function() {
         }
     };
 
-    // 📊 MOTOR DE TELEMETRÍA
     const renderStatsUI = (stats, container) => {
         if (!stats || Object.keys(stats).length === 0) {
             container.innerHTML = '<div class="text-center bg-[#050505] rounded-lg border border-slate-800 text-slate-500 py-8 text-[9px] md:text-[10px] font-mono font-bold tracking-widest"><i class="fa-solid fa-ban text-base md:text-lg block mb-2"></i> DATA_NOT_FOUND</div>';
@@ -549,37 +568,90 @@ const CevicheKernel = (function() {
         if(STATE.abortController) STATE.abortController.abort();
     };
 
-    // 🏗️ GESTOR DE CREACIÓN Y EDICIÓN
-    const initCreateModal = () => {
+    // 🚀 OBTENEDOR DE TEATROS (API FETCH)
+    const fetchVenuesForDropdown = async () => {
+        const select = document.getElementById('edit-venue');
+        const zeroAlert = document.getElementById('zero-state-alert');
+        const formInputs = document.querySelectorAll('#edit-event-form input, #edit-event-form textarea, #btn-save-edit');
+        
+        try {
+            select.innerHTML = '<option value="" disabled selected>Buscando matrices en red...</option>';
+            const res = await fetch('/api/v1/venues/');
+            const data = await res.json();
+            STATE.venues = Array.isArray(data) ? data : (data.results || []);
+
+            if (STATE.venues.length === 0) {
+                // 🛑 ESTADO CERO: No hay teatros
+                select.innerHTML = '<option value="" disabled selected>0 TEATROS DISPONIBLES</option>';
+                select.disabled = true;
+                zeroAlert.classList.remove('hidden');
+                formInputs.forEach(el => {
+                    el.disabled = true;
+                    el.classList.add('opacity-50', 'cursor-not-allowed');
+                });
+            } else {
+                // ✅ ESTADO OK: Teatros encontrados
+                select.disabled = false;
+                zeroAlert.classList.add('hidden');
+                formInputs.forEach(el => {
+                    el.disabled = false;
+                    el.classList.remove('opacity-50', 'cursor-not-allowed');
+                });
+                
+                select.innerHTML = '<option value="" disabled selected>-- Selecciona el Teatro Destino --</option>';
+                STATE.venues.forEach(v => {
+                    const opt = document.createElement('option');
+                    opt.value = v.id;
+                    opt.textContent = `${v.name} (${v.city || 'Ubicación General'})`;
+                    select.appendChild(opt);
+                });
+            }
+        } catch(e) {
+            select.innerHTML = '<option value="" disabled selected>Falla Crítica DB</option>';
+            select.disabled = true;
+        }
+    };
+
+    // 🏗️ GESTOR DE CREACIÓN
+    const initCreateModal = async () => {
         const modal = document.getElementById('modal-edit-event');
         document.getElementById('edit-event-form').reset(); 
         
         document.getElementById('edit-id').value = ''; 
         document.getElementById('edit-active').checked = true; 
         
+        // Bloquear Selector de Teatros para Creación Obligatoria
+        document.getElementById('venue-selector-container').classList.remove('hidden');
+        await fetchVenuesForDropdown(); // Traer los teatros VIVOS
+        
         const uploadRadio = document.querySelector('input[name="poster_method"][value="upload"]');
         if(uploadRadio) { uploadRadio.checked = true; togglePosterMethod(); }
         
         document.getElementById('modal-edit-title').textContent = "Inyectar Nodo";
-        document.getElementById('btn-save-edit').innerHTML = '<i class="fa-solid fa-rocket"></i> Ejecutar';
+        document.getElementById('btn-save-edit').innerHTML = '<i class="fa-solid fa-rocket"></i> Ejecutar Inyección';
         
         document.getElementById('stats-card').classList.add('hidden');
         document.getElementById('pricing-section').classList.add('hidden');
 
         modal.classList.remove('hidden');
         requestAnimationFrame(() => modal.setAttribute('data-state', 'open'));
-        document.body.style.overflow = 'hidden'; // Evitar scroll fondo en mobile
+        document.body.style.overflow = 'hidden'; 
     };
 
+    // 🏗️ GESTOR DE EDICIÓN
     const fetchAndOpenEdit = async (id) => {
         const modal = document.getElementById('modal-edit-event');
         const priceBody = document.getElementById('pricing-table-body');
         
         document.getElementById('modal-edit-title').textContent = "Modificar Atributos";
-        document.getElementById('btn-save-edit').innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Consolidar';
+        document.getElementById('btn-save-edit').innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Consolidar en DB';
         
         document.getElementById('stats-card').classList.remove('hidden');
         document.getElementById('pricing-section').classList.remove('hidden');
+        
+        // Ocultar selector de teatro en edición (el teatro ya está asignado y no debería cambiarse fácilmente)
+        document.getElementById('venue-selector-container').classList.add('hidden');
+        document.getElementById('zero-state-alert').classList.add('hidden');
 
         const uploadRadio = document.querySelector('input[name="poster_method"][value="upload"]');
         if(uploadRadio) { uploadRadio.checked = true; togglePosterMethod(); }
@@ -646,7 +718,7 @@ const CevicheKernel = (function() {
                     priceBody.appendChild(tr);
                 });
             } else {
-                priceBody.innerHTML = '<tr><td colspan="2" class="p-4 md:p-6 text-center text-[9px] md:text-[10px] uppercase font-black text-amber-500 tracking-widest bg-amber-500/10 border-t border-b border-amber-500/20"><i class="fa-solid fa-triangle-exclamation mr-1 md:mr-2"></i> Sin zonas</td></tr>';
+                priceBody.innerHTML = '<tr><td colspan="2" class="p-4 md:p-6 text-center text-[9px] md:text-[10px] uppercase font-black text-amber-500 tracking-widest bg-amber-500/10 border-t border-b border-amber-500/20"><i class="fa-solid fa-triangle-exclamation mr-1 md:mr-2"></i> Sin zonas registradas</td></tr>';
             }
 
             modal.classList.remove('hidden');
@@ -674,7 +746,6 @@ const CevicheKernel = (function() {
         STATE.isRequestPending = true;
 
         try {
-            // Asegúrate de tener una URL/Vista en backend configurada para borrar el evento. Ejemplo: path('events/<uuid:pk>/delete/', delete_view...)
             const res = await fetch(`/dashboard/events/${id}/delete/`, {
                 method: 'POST',
                 headers: { 'X-CSRFToken': '{{ csrf_token }}' }
@@ -699,6 +770,15 @@ const CevicheKernel = (function() {
 
         form.addEventListener('submit', async function(e) {
             e.preventDefault();
+            
+            // Validación Criptográfica Front-end
+            const venueSelect = document.getElementById('edit-venue');
+            const isCreation = !document.getElementById('edit-id').value;
+            if (isCreation && (!venueSelect.value || venueSelect.value === "")) {
+                spawnToast("Abortado: Debes vincular el evento a un Teatro.", "error");
+                return;
+            }
+
             if (STATE.isRequestPending) return;
             
             STATE.isRequestPending = true;
@@ -768,7 +848,7 @@ const CevicheKernel = (function() {
         openCreateModal: initCreateModal,
         openEditModal: fetchAndOpenEdit,
         closeEditModal: closeEditUI,
-        deleteEventNode: execDelete  // Expuesto método Delete
+        deleteEventNode: execDelete 
     };
 
 })(); 
