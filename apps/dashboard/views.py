@@ -427,3 +427,21 @@ class ShowFunctionUpdateView(LoginRequiredMixin, SuperUserRequiredMixin, View):
         except Exception as e:
             logger.exception("Excepción no controlada en motor de edición.")
             return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
+# Añade esto al final de apps/dashboard/views.py
+
+class ShowFunctionDeleteView(LoginRequiredMixin, SuperUserRequiredMixin, View):
+    """
+    🚨 PROTOCOLO DE PURGA ATÓMICA
+    Erradica un evento de la base de datos de forma irreversible.
+    """
+    def post(self, request, pk):
+        try:
+            event = get_object_or_404(ShowFunction, pk=pk)
+            event_name = event.name
+            event.delete()
+            logger.info(f"Nodo Erradicado: {event_name} (ID: {pk}) por el usuario {request.user}")
+            return JsonResponse({'status': 'success', 'message': 'Nodo erradicado exitosamente'})
+        except Exception as e:
+            logger.error(f"Fallo en la purga del evento {pk}: {str(e)}")
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
