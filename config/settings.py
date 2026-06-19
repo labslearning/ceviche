@@ -1,7 +1,7 @@
 """
 ⚙️ Configuración Maestra - Ceviche Platform (GOD-TIER CLOUD EDITION)
-Seguridad: Grado Alto (ATP) - Zero Trust Architecture.
-Infraestructura: Django + Railway + PostgreSQL + Redis + Celery
+Seguridad: Grado Bancario (PCI-DSS) - Zero Trust Architecture.
+Infraestructura: Django + Railway + PostgreSQL + Redis + Celery + MercadoPago
 """
 import os
 from pathlib import Path
@@ -15,7 +15,7 @@ import dj_database_url
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # ==============================================================================
-# 🔐 SEGURIDAD CORE
+# 🔐 SEGURIDAD CORE Y CRIPTOGRAFÍA
 # ==============================================================================
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-development-key-change-me')
 
@@ -23,28 +23,54 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-development-key-chang
 DEBUG = config('DEBUG', default=True, cast=bool)
 
 # ==============================================================================
-# 🌐 FIREWALL DE DOMINIOS Y CORS (CLOUD NATIVE)
+# 🌐 FIREWALL DE DOMINIOS, CORS Y SITE_URL (CLOUD NATIVE)
 # ==============================================================================
 # 1. Hosts base locales y de túneles (Ngrok)
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='127.0.0.1,localhost,.ngrok-free.dev', cast=Csv())
 CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', default='http://127.0.0.1,http://localhost,https://*.ngrok-free.dev', cast=Csv())
 
-# 2. 🚀 INYECCIÓN DINÁMICA RAILWAY (La magia del Auto-Scaling)
+# 2. 🚀 INYECCIÓN DINÁMICA RAILWAY (Auto-Scaling & Webhooks MP)
 RAILWAY_DOMAIN = os.environ.get('RAILWAY_PUBLIC_DOMAIN')
+
 if RAILWAY_DOMAIN:
     ALLOWED_HOSTS.append(RAILWAY_DOMAIN)
     ALLOWED_HOSTS.append('.up.railway.app')
     CSRF_TRUSTED_ORIGINS.append(f'https://{RAILWAY_DOMAIN}')
     CSRF_TRUSTED_ORIGINS.append('https://*.up.railway.app')
+    # Dominio Absoluto para callbacks de Mercado Pago (Success, Failure, Webhooks)
+    SITE_URL = f"https://{RAILWAY_DOMAIN}"
+else:
+    SITE_URL = config('SITE_URL', default='http://localhost:8000')
 
-CORS_ALLOW_ALL_ORIGINS = True  # Para consumo de APIs desde cualquier frontend
-
-# 3. 🛡️ REGLAS DE PRODUCCIÓN ESTRICTAS (Solo aplican si DEBUG=False)
+# 3. 🛡️ REGLAS DE PRODUCCIÓN ESTRICTAS (Nivel Bancario - PCI-DSS)
 if not DEBUG:
+    # Fuerza HTTPS detrás del proxy de Railway
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     SECURE_SSL_REDIRECT = True
+    
+    # Blindaje de Cookies (Anti Memory Dumping & Session Hijacking)
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_HTTPONLY = True # Evita lectura desde JS
+    SESSION_COOKIE_SAMESITE = 'Strict' # Anti CSRF cruzado
+    
+    # HSTS: Obliga a los navegadores a usar solo HTTPS (Anti Man-in-the-Middle)
+    SECURE_HSTS_SECONDS = 31536000  # 1 año
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    
+    # Previene inyección de MIME types (Sniffing) y Clickjacking
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_BROWSER_XSS_FILTER = True
+    
+    # CORS Restringido: Solo nuestro dominio puede consumir las APIs de pago
+    CORS_ALLOW_ALL_ORIGINS = False
+    CORS_ALLOWED_ORIGINS = [
+        f"https://{RAILWAY_DOMAIN}" if RAILWAY_DOMAIN else "https://tu-dominio-produccion.com",
+    ]
+else:
+    # En desarrollo permitimos todo para facilitar el debugging
+    CORS_ALLOW_ALL_ORIGINS = True
 
 # ==============================================================================
 # 📦 APLICACIONES Y MIDDLEWARES
@@ -241,7 +267,8 @@ JAZZMIN_SETTINGS = {
 }
 
 # ==============================================================================
-# 💳 MERCADO PAGO INTEGRATION
+# 💳 MERCADO PAGO INTEGRATION (FINTECH CORE)
 # ==============================================================================
-MERCADO_PAGO_ACCESS_TOKEN = config('MERCADO_PAGO_ACCESS_TOKEN', default='')
-MERCADO_PAGO_PUBLIC_KEY = config('MERCADO_PAGO_PUBLIC_KEY', default='')
+# IMPORTANTE: En el panel de variables de Railway debes declarar estas llaves EXACTAMENTE ASÍ
+MERCADOPAGO_ACCESS_TOKEN = config('MERCADOPAGO_ACCESS_TOKEN', default='')
+MERCADOPAGO_PUBLIC_KEY = config('MERCADOPAGO_PUBLIC_KEY', default='')

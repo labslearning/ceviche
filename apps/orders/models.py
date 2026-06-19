@@ -1,8 +1,8 @@
 import uuid
 import secrets
-import time
 import hmac
 import hashlib
+import json
 from decimal import Decimal
 from django.db import models, transaction, OperationalError
 from django.conf import settings
@@ -30,7 +30,9 @@ def generate_secure_token():
     return secrets.token_urlsafe(64)
 
 def secure_compare(val1, val2):
-    """Mitiga ataques de tiempo (Time-Timing Attacks) al comparar strings"""
+    """Mitiga ataques temporales (Time-Timing Attacks) al comparar strings"""
+    if val1 is None or val2 is None:
+        return False
     return hmac.compare_digest(str(val1), str(val2))
 
 # ==============================================================================
@@ -43,7 +45,7 @@ class Order(models.Model):
     """
     class Status(models.TextChoices):
         PENDING = 'PENDING', _('Pendiente de Pago')
-        PROCESSING = 'PROCESSING', _('Procesando en Pasarela') # Para evitar doble cobro
+        PROCESSING = 'PROCESSING', _('Procesando en Pasarela') 
         APPROVED = 'APPROVED', _('Aprobada (Pagada)')
         REJECTED = 'REJECTED', _('Rechazada/Fallida')
         CANCELLED = 'CANCELLED', _('Cancelada')
@@ -76,12 +78,12 @@ class Order(models.Model):
     ip_address = models.GenericIPAddressField(null=True, blank=True)
     user_agent = models.TextField(null=True, blank=True)
     
-    # Trazabilidad de Pasarela (Wompi/SIIGO)
+    # Trazabilidad de Pasarela (Mercado Pago / Wompi / SIIGO)
     wompi_reference = models.CharField(max_length=100, unique=True, default=generate_order_reference, editable=False, db_index=True)
     wompi_transaction_id = models.CharField(max_length=100, blank=True, null=True, unique=True, db_index=True)
     siigo_invoice_id = models.CharField(max_length=100, blank=True, null=True, db_index=True)
     
-    # Data Dumping: Almacena todo el JSON de Wompi. Útil para Debugging avanzado
+    # Data Dumping: Almacena todo el JSON del banco. Útil para Debugging avanzado
     payment_metadata = models.JSONField(default=dict, blank=True, help_text="Log crudo e inmutable del Webhook")
     
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
@@ -97,7 +99,14 @@ class Order(models.Model):
 
     def clean(self):
         if self.amount_paid > self.total_amount:
-            raise ValidationError("El monto pagado no puede exceder el total de la orden.")
+            raise ValidationError("Violación Financiera: El monto pagado no puede exceder el total de la orden.")
+        if self.total_amount < 0 or self.amount_paid < 0:
+            raise ValidationError("Violación Financiera: Los montos no pueden ser negativos.")
+
+    def save(self, *args, **kwargs):
+        # 🛡️ OBLIGA LA VALIDACIÓN: Django no ejecuta clean() por defecto en save()
+        self.full_clean()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         user_display = self.user.email if self.user else "Invitado Anónimo"
@@ -146,12 +155,13 @@ class Ticket(models.Model):
 
     def generate_signature(self):
         """
-        Firma el ticket mezclando el ID de la BD, el ID del Evento y el Token.
-        Si un atacante copia el QR de un evento a otro, la firma se rompe.
+        Firma el ticket serializando a JSON para evitar 'Delimiter Injection Attacks'.
         """
         secret_key = getattr(settings, f'TICKET_SECRET_KEY_V{self.key_version}', settings.SECRET_KEY)
-        message = f"{self.id}|{self.function_id}|{self.qr_token}|{self.seat_label}".encode('utf-8')
-        return hmac.new(secret_key.encode('utf-8'), message, hashlib.sha256).hexdigest()
+        
+        # 🛡️ JSON Array asegura que los valores no colisionen (Elimina Inyección de Strings)
+        payload = json.dumps([str(self.id), str(self.function_id), self.qr_token, self.seat_label], separators=(',', ':'))
+        return hmac.new(secret_key.encode('utf-8'), payload.encode('utf-8'), hashlib.sha256).hexdigest()
 
     def save(self, *args, **kwargs):
         if not self.crypto_signature:
@@ -175,7 +185,7 @@ class Ticket(models.Model):
 
         try:
             with transaction.atomic():
-                # nowait=True lanza OperationalError instantáneo si otro escáner está procesando el mismo ticket
+                # nowait=True lanza OperationalError instantáneo si otro escáner procesa el mismo ticket a la vez
                 locked_ticket = Ticket.objects.select_for_update(nowait=True).get(id=self.id)
                 
                 new_state, action, reason, success = None, None, "OK", False
@@ -204,7 +214,7 @@ class Ticket(models.Model):
 
         except OperationalError:
             # Capturamos el Deadlock: Alguien más está escaneando este exacto ticket AHORA
-            self._log_scan(gate_id, scanner_agent_id, 'DENIED', "Race Condition: Intento de doble escaneo simultáneo", self.state)
+            self._log_scan(gate_id, scanner_agent_id, 'DENIED', "Race Condition: Intento de doble escaneo", self.state)
             return False, "ERROR: DOBLE ESCANEO DETECTADO"
 
     def _log_scan(self, gate, agent, action, reason, state_at_moment):
@@ -235,7 +245,9 @@ class TicketScan(models.Model):
     # RESTRICT: Historial blindado
     ticket = models.ForeignKey(Ticket, on_delete=models.RESTRICT, related_name='scans')
     
-    timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
+    # 🛡️ CORRECCIÓN: Usamos default=timezone.now en lugar de auto_now_add para garantizar que 
+    # el timestamp existe exacto ANTES de crear el Integrity Hash.
+    timestamp = models.DateTimeField(default=timezone.now, db_index=True)
     gate_id = models.CharField(max_length=50)
     scanner_agent_id = models.CharField(max_length=100)
     
@@ -254,18 +266,14 @@ class TicketScan(models.Model):
         ]
 
     def _generate_integrity_hash(self):
-        """Crea un hash del registro. Si alguien edita el SQL a mano, el hash se rompe."""
-        payload = f"{self.ticket_id}|{self.gate_id}|{self.action}|{self.state_at_scan}|{self.timestamp}".encode('utf-8')
-        return hashlib.sha256(payload).hexdigest()
+        """Crea un hash del registro. Si un hacker edita el SQL a mano, el hash se rompe."""
+        payload = json.dumps([str(self.ticket_id), self.gate_id, self.action, self.state_at_scan, str(self.timestamp.isoformat())], separators=(',', ':'))
+        return hashlib.sha256(payload.encode('utf-8')).hexdigest()
 
     def save(self, *args, **kwargs):
         if self.pk is not None:
             # PREVIENE ACTUALIZACIONES: EL LEDGER ES APPEND-ONLY (Solo Escritura)
-            raise ValidationError("Los registros de auditoría (TicketScan) son inmutables y no pueden ser modificados.")
-        
-        # El timestamp se asegura antes de guardar para el hash
-        if not self.timestamp:
-            self.timestamp = timezone.now()
+            raise ValidationError("Violación: Los registros de auditoría (TicketScan) son inmutables.")
             
         self.integrity_hash = self._generate_integrity_hash()
         super().save(*args, **kwargs)
@@ -287,6 +295,8 @@ class OrderItem(models.Model):
     """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     order = models.ForeignKey(Order, on_delete=models.RESTRICT, related_name='items')
+    
+    # Asumimos que tienes una app 'products'. Si no, comenta esta línea.
     product = models.ForeignKey('products.Product', on_delete=models.RESTRICT)
     
     quantity = models.PositiveIntegerField(default=1)
@@ -298,8 +308,12 @@ class OrderItem(models.Model):
     def clean(self):
         if self.quantity <= 0:
             raise ValidationError("La cantidad debe ser mayor a cero.")
-        if self.price_at_purchase < 0:
-            raise ValidationError("El precio no puede ser negativo.")
+        if self.price_at_purchase < 0 or self.discount_applied < 0:
+            raise ValidationError("El precio y el descuento no pueden ser negativos.")
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
 
     @property
     def total_line(self):
