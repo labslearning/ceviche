@@ -1,237 +1,394 @@
 {% extends 'base.html' %} 
 {% load humanize static %}
 
-{% block title %}{{ event_name }} | Selección de Asientos{% endblock %}
+{% block title %}{{ event_name|default:"Evento" }} | Selección de Asientos{% endblock %}
 
 {% block extra_css %}
 <link href="https://cdn.jsdelivr.net/npm/@sweetalert2/theme-dark@4/dark.css" rel="stylesheet">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
 <style>
-    /* === 1. ARQUITECTURA VISUAL (VARIABLES) === */
+    /* ==========================================================================
+       1. ARQUITECTURA VISUAL (FINTECH & CYBER ESTÉTICA)
+    ========================================================================== */
     :root {
-        --color-primary: #00E676; /* Verde Neon */
-        --color-vip: #FFD700;     /* Dorado */
-        --color-sold: #2c2c2c;    /* Gris Apagado */
-        --color-bg: #050505;      /* Negro Profundo */
-        --color-surface: #141414; /* Gris Superficie */
-        --seat-size: 34px;        /* Tamaño Optimizado */
+        --color-primary: #00E676; 
+        --color-primary-dim: rgba(0, 230, 118, 0.2);
+        --color-vip: #FFD700;     
+        --color-sold: #2c2c2c;    
+        --color-bg: #030305;      
+        --color-surface: #0a0a0c; 
+        --color-glass: rgba(10, 10, 12, 0.85);
+        --seat-size: 36px;        /* Tamaño Touch-Friendly (Apple Standards) */
+        
+        --safe-top: env(safe-area-inset-top, 0px);
+        --safe-bottom: env(safe-area-inset-bottom, 16px);
     }
 
     body {
         font-family: 'Inter', sans-serif;
         background-color: var(--color-bg);
-        overflow-x: hidden; /* Evitar scroll horizontal global */
+        overflow: hidden; /* Control estricto de pantalla para App-Like Feel */
+        overscroll-behavior: none; /* Bloquea el "Pull to Refresh" nativo en móviles */
+        color: white;
+        margin: 0;
+        padding: 0;
     }
 
-    .booking-container {
+    .booking-engine {
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
         display: flex;
-        flex-wrap: wrap;
-        min-height: calc(100vh - 80px); /* Altura completa menos header */
-        position: relative;
+        flex-direction: column;
+        z-index: 1;
     }
 
-    /* === 2. ÁREA DEL MAPA (CONTENEDOR INTELIGENTE) === */
+    @media (min-width: 992px) {
+        .booking-engine { flex-direction: row; }
+    }
+
+    /* ==========================================================================
+       2. MOTOR DE MAPA Y NAVEGACIÓN (HARDWARE ACCELERATED)
+    ========================================================================== */
     .map-section {
         flex: 1;
         position: relative;
-        background: radial-gradient(circle at center, #1a1a1a 0%, #000 100%);
-        overflow: hidden; /* Oculta lo que se salga del borde */
-        height: 100%;
-        min-height: 600px;
-        cursor: grab;
-        touch-action: none; /* VITAL: Desactiva gestos nativos del navegador */
+        background-image: 
+            radial-gradient(circle at 50% 50%, rgba(255,255,255,0.02) 1px, transparent 1px),
+            radial-gradient(circle at 50% 50%, rgba(0, 230, 118, 0.02) 0%, transparent 60%);
+        background-size: 30px 30px, 100% 100%;
+        overflow: hidden; 
+        touch-action: none; /* VITAL: Bloquea scroll nativo para habilitar Pinch-to-Zoom */
         user-select: none;
+        -webkit-user-select: none;
+        cursor: grab;
     }
     .map-section:active { cursor: grabbing; }
 
-    /* Lienzo de Renderizado (El objeto que se mueve) */
     #seat-map-render {
         position: absolute;
-        top: 0;
-        left: 0;
-        width: 0; height: 0; /* El tamaño lo definen los hijos */
-        transform-origin: 0 0; /* EL SECRETO MATEMÁTICO: Origen en (0,0) */
-        will-change: transform; /* Optimización GPU */
-        /* Transición suave solo si NO estamos arrastrando (se controla por JS) */
-        transition: transform 0.1s cubic-bezier(0.1, 0.7, 1.0, 0.1); 
+        top: 0; left: 0;
+        width: 0; height: 0;
+        transform-origin: 0 0; 
+        will-change: transform; 
+        /* Transición suave regulada por JS para no interferir con Drag/Pinch */
     }
 
-    /* === 3. SILLAS REALISTAS === */
+    /* Smart Zone Nav (Mobile Top Nav) */
+    .zone-navigator {
+        position: absolute;
+        top: calc(16px + var(--safe-top));
+        left: 0;
+        width: 100%;
+        padding: 0 16px;
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        z-index: 200;
+        -ms-overflow-style: none;  /* IE and Edge */
+        scrollbar-width: none;  /* Firefox */
+    }
+    .zone-navigator::-webkit-scrollbar { display: none; }
+    
+    .zone-btn {
+        background: rgba(0,0,0,0.6);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(255,255,255,0.1);
+        color: white;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 800;
+        white-space: nowrap;
+        cursor: pointer;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        transition: 0.3s;
+    }
+    .zone-btn:hover { background: var(--color-primary-dim); border-color: var(--color-primary); color: var(--color-primary); }
+
+    /* ==========================================================================
+       3. SILLAS (Nodos Interactivos)
+    ========================================================================== */
     .seat {
         position: absolute; 
         width: var(--seat-size);
         height: var(--seat-size);
-        background-color: #333;
+        background-color: #222;
         border-radius: 8px 8px 12px 12px;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 10px;
-        font-weight: 700;
-        color: rgba(255,255,255,0.6);
-        transition: transform 0.2s, background 0.2s, box-shadow 0.2s;
-        box-shadow: 0 4px 0 #1a1a1a;
+        font-size: 11px;
+        font-weight: 800;
+        color: rgba(255,255,255,0.8);
+        transition: transform 0.2s cubic-bezier(0.19, 1, 0.22, 1), background 0.2s, box-shadow 0.2s;
+        box-shadow: 0 4px 0 #111, inset 0 2px 4px rgba(255,255,255,0.1);
         z-index: 10;
-        /* Centrar punto de anclaje visualmente */
         transform: translate(-50%, -50%); 
+        touch-action: manipulation; /* Remueve 300ms delay en móviles */
     }
 
     .seat:hover:not(.sold) {
-        transform: translate(-50%, -65%) scale(1.3);
-        background-color: #555;
+        transform: translate(-50%, -65%) scale(1.15);
+        background-color: #444;
         color: white;
         z-index: 100;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.7);
-        border: 1px solid rgba(255,255,255,0.2);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.8), 0 4px 0 #222;
     }
 
     .seat.selected {
         background-color: var(--color-primary);
         color: #000;
-        box-shadow: 0 0 15px var(--color-primary);
-        border: 1px solid #fff;
+        box-shadow: 0 0 20px var(--color-primary-dim), 0 4px 0 #00994d;
+        border: none;
         z-index: 50;
         transform: translate(-50%, -50%) scale(1.1);
     }
-
-    .seat.vip {
-        border-top: 3px solid var(--color-vip);
-    }
-    .seat.vip::before {
-        content: '';
-        position: absolute;
-        bottom: -5px; left: 50%; transform: translateX(-50%);
-        width: 4px; height: 4px; border-radius: 50%;
-        background: var(--color-vip);
-    }
-
+    
+    .seat.vip { border-top: 3px solid var(--color-vip); }
     .seat.sold {
         background-color: var(--color-sold);
-        color: transparent;
+        color: rgba(255,255,255,0.2);
         box-shadow: none;
         cursor: not-allowed;
-        opacity: 0.4;
+        transform: translate(-50%, -50%) scale(0.95);
     }
-    .seat.sold::after {
-        content: "✕"; color: #555; font-size: 14px;
-    }
+    .seat.sold::after { content: "✕"; position: absolute; font-size: 16px; color: rgba(255,255,255,0.2); }
 
-    /* Etiquetas de Bloque */
     .block-label {
         position: absolute;
-        color: rgba(255,255,255,0.15);
-        font-size: 40px;
+        color: rgba(255,255,255,0.08);
+        font-size: 60px;
         font-weight: 900;
         text-transform: uppercase;
         pointer-events: none;
         transform: translate(-50%, -50%);
         white-space: nowrap;
         z-index: 1;
+        letter-spacing: -2px;
     }
 
-    /* === 4. UI FLOTANTE === */
+    /* ==========================================================================
+       4. UI DE CONTROL & LEYENDA
+    ========================================================================== */
     .map-controls {
         position: absolute;
-        bottom: 30px;
-        right: 30px; /* Cambiado a derecha para ergonomía */
+        bottom: calc(80px + var(--safe-bottom)); /* Arriba de la Píldora Flotante */
+        right: 16px;
         display: flex;
         flex-direction: column;
         gap: 8px;
         z-index: 200;
     }
+    @media (min-width: 992px) {
+        .map-controls { bottom: 30px; right: 30px; }
+    }
     
     .ctrl-btn {
-        width: 40px; height: 40px;
-        border-radius: 8px;
-        background: white;
-        border: none;
-        color: #000;
+        width: 44px; height: 44px;
+        border-radius: 12px;
+        background: var(--color-glass);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255,255,255,0.1);
+        color: white;
         cursor: pointer;
         display: flex; align-items: center; justify-content: center;
         font-size: 16px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.5);
         transition: 0.2s;
     }
-    .ctrl-btn:hover { background: var(--color-primary); transform: scale(1.05); }
+    .ctrl-btn:hover { background: var(--color-primary); color: black; border-color: var(--color-primary); }
 
     .legend {
         position: absolute;
-        top: 20px;
-        left: 20px;
-        background: rgba(20,20,20,0.85);
-        padding: 15px;
+        bottom: calc(80px + var(--safe-bottom));
+        left: 16px;
+        background: var(--color-glass);
+        padding: 12px 16px;
         border-radius: 12px;
         backdrop-filter: blur(10px);
         border: 1px solid rgba(255,255,255,0.1);
         pointer-events: none;
         z-index: 200;
+        display: none; 
     }
-    .legend-item { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; font-size: 12px; color: #ccc; font-weight: 600; }
-    .dot { width: 10px; height: 10px; border-radius: 3px; }
+    @media (min-width: 768px) { .legend { display: flex; flex-direction: column; bottom: 30px; } }
+    .legend-item { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; font-size: 10px; color: #aaa; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;}
+    .dot { width: 12px; height: 12px; border-radius: 4px; }
 
-    /* === 5. SIDEBAR (CARRITO) === */
+    /* ==========================================================================
+       5. 🚀 GOD-TIER CHECKOUT: PÍLDORA FLOTANTE & BOTTOM SHEET NATIVO
+    ========================================================================== */
+    
+    /* Píldora Flotante (Botón Central en el Lienzo) */
+    .floating-cart-pill {
+        position: absolute;
+        bottom: calc(20px + var(--safe-bottom));
+        left: 50%;
+        transform: translateX(-50%) translateY(100px); /* Oculto inicialmente abajo */
+        background: rgba(10, 10, 12, 0.95);
+        backdrop-filter: blur(15px);
+        border: 1px solid rgba(0, 230, 118, 0.4);
+        padding: 12px 24px;
+        border-radius: 30px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        z-index: 250;
+        color: white;
+        box-shadow: 0 10px 40px rgba(0, 230, 118, 0.2);
+        transition: transform 0.4s cubic-bezier(0.19, 1, 0.22, 1), opacity 0.3s ease;
+        opacity: 0; pointer-events: none;
+        cursor: pointer;
+    }
+    
+    .floating-cart-pill.visible {
+        transform: translateX(-50%) translateY(0);
+        opacity: 1; pointer-events: auto;
+    }
+
+    .pill-badge {
+        background: var(--color-primary);
+        color: black;
+        font-weight: 900;
+        font-family: monospace;
+        width: 24px; height: 24px;
+        border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 12px;
+    }
+
+    .pill-text {
+        font-size: 12px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    .pill-total {
+        font-size: 14px;
+        font-family: monospace;
+        font-weight: 900;
+        color: var(--color-primary);
+    }
+
+    @media (min-width: 992px) {
+        .floating-cart-pill { display: none !important; }
+    }
+
+    /* Contenedor del Carrito Desplegable */
     .sidebar-section {
-        width: 380px;
-        background: var(--color-surface);
-        border-left: 1px solid #222;
-        padding: 30px;
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        z-index: 300;
+        pointer-events: none; /* Invisible hasta que se abra */
         display: flex;
         flex-direction: column;
-        z-index: 300;
-        box-shadow: -10px 0 40px rgba(0,0,0,0.5);
+        justify-content: flex-end;
     }
 
-    @media (max-width: 992px) {
-        .booking-container { flex-direction: column; }
-        .sidebar-section { width: 100%; border-left: none; border-top: 1px solid #333; height: auto; min-height: unset; }
-        .map-section { height: 60vh; min-height: 400px; }
-        .map-controls { bottom: 20px; right: 20px; }
+    /* Backdrop Oscuro del Móvil */
+    .mobile-cart-backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(0,0,0,0.8);
+        backdrop-filter: blur(5px);
+        opacity: 0;
+        transition: opacity 0.3s;
     }
 
-    .tickets-scroll {
-        flex: 1;
-        overflow-y: auto;
-        margin: 20px 0;
-        padding-right: 5px;
-        border-top: 1px solid #2a2a2a;
-        border-bottom: 1px solid #2a2a2a;
+    /* La Caja de los Tickets (Desliza desde abajo) */
+    .cart-details-wrapper {
+        background: var(--color-surface);
+        border-top-left-radius: 24px;
+        border-top-right-radius: 24px;
+        box-shadow: 0 -10px 50px rgba(0,0,0,0.9);
+        pointer-events: auto; /* Restaura eventos táctiles aquí */
+        display: flex; flex-direction: column;
+        width: 100%;
+        position: relative;
+        z-index: 10;
+        
+        transform: translateY(100%);
+        transition: transform 0.4s cubic-bezier(0.19, 1, 0.22, 1);
+        max-height: 85vh; /* Ocupa hasta el 85% de la pantalla */
+    }
+    
+    /* Estados Activos */
+    .sidebar-section.expanded { pointer-events: auto; }
+    .sidebar-section.expanded .mobile-cart-backdrop { opacity: 1; }
+    .sidebar-section.expanded .cart-details-wrapper { transform: translateY(0); }
+
+    /* Estructura Interna del Carrito */
+    .cart-header-mobile {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 20px 24px; border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .cart-close-btn {
+        width: 32px; height: 32px; border-radius: 50%; background: rgba(255,255,255,0.1);
+        color: white; border: none; display: flex; align-items: center; justify-content: center;
+        font-size: 14px; cursor: pointer;
     }
 
+    .event-info { padding: 20px 24px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .tickets-scroll { flex: 1; overflow-y: auto; padding: 0 24px; min-height: 200px; }
+    
     .ticket-row {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 12px 0;
-        border-bottom: 1px solid #222;
-        animation: fadeIn 0.3s ease;
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 16px 0; border-bottom: 1px dashed rgba(255,255,255,0.1);
+        animation: slideIn 0.3s cubic-bezier(0.19, 1, 0.22, 1);
     }
-    @keyframes fadeIn { from { opacity:0; transform:translateX(10px); } to { opacity:1; } }
+    @keyframes slideIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+
+    /* 💳 Área del Botón de Pago */
+    .checkout-area {
+        background: rgba(10,10,12,0.98);
+        backdrop-filter: blur(20px);
+        padding: 16px 24px calc(16px + var(--safe-bottom));
+        border-top: 1px solid rgba(255,255,255,0.05);
+        display: flex; flex-direction: column; gap: 12px;
+        z-index: 310;
+    }
 
     .btn-main {
         width: 100%; padding: 16px;
         background: white; color: black;
-        font-weight: 800; border: none; border-radius: 6px;
-        font-size: 15px; letter-spacing: 0.5px; text-transform: uppercase;
+        font-weight: 900; border: none; border-radius: 12px;
+        font-size: 15px; letter-spacing: 1px; text-transform: uppercase;
         cursor: pointer; transition: all 0.2s;
+        display: flex; align-items: center; justify-content: center; gap: 10px;
+        box-shadow: 0 4px 15px rgba(255,255,255,0.1);
     }
-    .btn-main:hover:not(:disabled) { transform: translateY(-2px); background: var(--color-primary); box-shadow: 0 5px 15px rgba(0,230,118,0.3); }
-    .btn-main:disabled { background: #333; color: #666; cursor: not-allowed; }
+    .btn-main:hover:not(:disabled) { transform: translateY(-2px); background: var(--color-primary); box-shadow: 0 10px 25px rgba(0,230,118,0.3); }
+    .btn-main:active:not(:disabled) { transform: translateY(0) scale(0.98); }
+    .btn-main:disabled { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.2); box-shadow: none; cursor: not-allowed; }
 
-    /* Tooltip */
+    /* Desktop Layout Rules (Overrides the Mobile Focus) */
+    @media (min-width: 992px) {
+        .sidebar-section {
+            position: relative; width: 400px;
+            pointer-events: auto; box-shadow: -10px 0 40px rgba(0,0,0,0.5);
+            background: var(--color-surface);
+            display: flex;
+        }
+        .mobile-cart-backdrop { display: none; }
+        .cart-details-wrapper {
+            max-height: none !important; opacity: 1 !important; flex: 1; border-radius: 0; box-shadow: none;
+            transform: none;
+        }
+        .cart-header-mobile { display: none; }
+        .event-info { padding: 30px 30px 20px; }
+        .tickets-scroll { padding: 0 30px; }
+        .checkout-area { padding: 24px 30px; }
+    }
+
+    /* Tooltip Nativo (Desktop) */
     #tooltip {
-        position: fixed;
-        background: rgba(0,0,0,0.95);
-        color: white;
-        padding: 12px 16px;
-        border-radius: 8px;
-        font-size: 12px;
-        pointer-events: none;
-        display: none;
-        z-index: 9999;
-        border: 1px solid #333;
-        box-shadow: 0 10px 40px rgba(0,0,0,0.8);
-        transform: translate(15px, 15px);
+        position: fixed; background: rgba(0,0,0,0.9); color: white; padding: 10px 14px;
+        border-radius: 8px; font-size: 11px; pointer-events: none; display: none; z-index: 9999;
+        border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+        backdrop-filter: blur(10px); transform: translate(15px, 15px);
     }
 </style>
 {% endblock %}
@@ -239,61 +396,89 @@
 {% block content %}
 <div id="tooltip"></div>
 
-<div class="booking-container">
+<div class="booking-engine">
     
     <div class="map-section" id="map-container">
         
+        <div class="zone-navigator" id="zone-navigator">
+            </div>
+
         <div id="seat-map-render">
-            <div id="loading-msg" class="text-center" style="position:absolute; left: 500px; top: 300px; transform:translate(-50%, -50%); width: 200px;">
-                <i class="fas fa-spinner fa-spin fa-2x text-muted"></i>
-                <p class="mt-2 text-muted" style="font-size:12px;">Cargando Mapa...</p>
+            <div id="loading-msg" class="text-center" style="position:absolute; left: 50vw; top: 50vh; transform:translate(-50%, -50%); width: 250px;">
+                <i class="fas fa-satellite-dish fa-spin fa-3x text-brand-primary mb-4" style="color:var(--color-primary)"></i>
+                <p class="mt-2 font-mono" style="font-size:10px; color:#aaa; letter-spacing:2px; text-transform:uppercase;">Decodificando Topología...</p>
             </div>
         </div>
 
         <div class="legend">
-            <div class="legend-item"><div class="dot" style="background:#333"></div> Disponible</div>
-            <div class="legend-item"><div class="dot" style="background:var(--color-primary)"></div> Tu Selección</div>
+            <div class="legend-item"><div class="dot" style="background:#222"></div> Libre</div>
+            <div class="legend-item"><div class="dot" style="background:var(--color-primary)"></div> Selección</div>
             <div class="legend-item"><div class="dot" style="background:var(--color-sold)"></div> Vendido</div>
-            <div class="legend-item"><div class="dot" style="background:#333; border-top:2px solid var(--color-vip)"></div> VIP</div>
+            <div class="legend-item"><div class="dot" style="background:#222; border-top:2px solid var(--color-vip)"></div> VIP</div>
         </div>
 
         <div class="map-controls">
             <button class="ctrl-btn" id="zoom-in" title="Acercar"><i class="fas fa-plus"></i></button>
             <button class="ctrl-btn" id="zoom-out" title="Alejar"><i class="fas fa-minus"></i></button>
-            <button class="ctrl-btn" id="zoom-reset" title="Restablecer"><i class="fas fa-compress-arrows-alt"></i></button>
+            <button class="ctrl-btn" id="zoom-reset" title="Restablecer (Auto-Fit)"><i class="fas fa-expand"></i></button>
         </div>
+
+        <button id="floating-cart-pill" class="floating-cart-pill" onclick="CevicheTicketEngine.toggleCart()">
+            <span id="pill-count" class="pill-badge">0</span>
+            <span class="pill-text">Ver Compra</span>
+            <span id="pill-total" class="pill-total">$0</span>
+        </button>
+
     </div>
 
-    <div class="sidebar-section">
-        <div class="event-info">
-            <h5 style="color: var(--color-primary); text-transform:uppercase; font-size:11px; letter-spacing:1px; font-weight:800; margin-bottom:5px;">Compra de Boletas</h5>
-            <h2 style="font-size: 1.6rem; color: white; margin: 0;">{{ event_name }}</h2>
-            <p class="text-muted" style="font-size: 13px; margin-top: 10px; line-height: 1.6;">
-                <i class="far fa-calendar-alt" style="margin-right: 5px;"></i> {{ function.date_time|date:"l d F, Y" }}<br>
-                <i class="fas fa-map-marker-alt" style="margin-right: 5px;"></i> {{ venue.name }}<br>
-                <i class="far fa-clock" style="margin-right: 5px;"></i> {{ function.date_time|date:"h:i A" }}
-            </p>
-        </div>
+    <div class="sidebar-section" id="cart-sheet">
+        
+        <div class="mobile-cart-backdrop" onclick="CevicheTicketEngine.toggleCart()"></div>
 
-        <div class="tickets-scroll" id="cart-list">
-            <div class="text-center text-muted" id="empty-state" style="padding-top: 50px; opacity: 0.5;">
-                <i class="fas fa-couch fa-2x mb-3"></i><br>
-                Selecciona tus sillas<br>en el mapa interactivo
+        <div class="cart-details-wrapper" id="cart-details-wrapper">
+            
+            <div class="cart-header-mobile">
+                <span style="font-weight:900; font-size:16px; letter-spacing:1px; text-transform:uppercase;">Tus Boletas</span>
+                <button class="cart-close-btn" onclick="CevicheTicketEngine.toggleCart()"><i class="fa-solid fa-xmark"></i></button>
             </div>
-        </div>
 
-        <div class="checkout-area">
-            <div class="d-flex justify-content-between align-items-end mb-3">
-                <span class="text-muted" style="font-size: 14px;">Total a Pagar</span>
-                <span style="font-size: 26px; font-weight: 800; color: white;">
-                    $<span id="total-amount">0</span>
-                </span>
+            <div class="event-info">
+                <h5 style="color: var(--color-primary); text-transform:uppercase; font-size:10px; letter-spacing:2px; font-weight:900; margin-bottom:8px;">Booking Asegurado</h5>
+                <h2 style="font-size: 1.4rem; color: white; margin: 0; font-weight: 900; line-height: 1.1;">{{ event_name|default:"Evento en Vivo" }}</h2>
+                <div style="font-size: 11px; margin-top: 12px; color: #888; font-family: monospace;" class="flex flex-col gap-1">
+                    <span class="text-white"><i class="far fa-calendar-alt text-[10px] mr-1"></i> {{ function.date_time|date:"l d F, Y" }}</span>
+                    <span><i class="fas fa-map-marker-alt text-[10px] mr-1"></i> {{ venue.name|default:"Ubicación Central" }}</span>
+                    <span><i class="far fa-clock text-[10px] mr-1"></i> {{ function.date_time|date:"h:i A" }}</span>
+                </div>
             </div>
-            
-            <button id="btn-pay" class="btn-main" disabled>Continuar al Pago</button>
-            
-            <div class="text-center mt-3" style="font-size: 10px; color: #444;">
-                <i class="fas fa-shield-alt"></i> Transacción segura encriptada por Wompi
+
+            <div class="tickets-scroll" id="cart-list">
+                <div class="text-center" id="empty-state" style="padding-top: 40px; opacity: 0.3;">
+                    <i class="fas fa-ticket-alt fa-3x mb-4"></i>
+                    <p style="font-size:12px; font-weight:600;">Tu bóveda de tickets está vacía.<br>Toca las sillas para reservar.</p>
+                </div>
+            </div>
+
+            <div class="checkout-area">
+                <div style="display:flex; justify-content:space-between; align-items:flex-end;">
+                    <div style="display:flex; flex-direction:column;">
+                        <span style="font-size: 10px; color:#aaa; font-weight:800; text-transform:uppercase; letter-spacing:1px; display:flex; align-items:center; gap:6px;">
+                            Total a Pagar
+                        </span>
+                        <span style="font-size: 11px; color:var(--color-primary); font-family:monospace; font-weight:bold;"><span id="sheet-ticket-count">0</span> Tickets</span>
+                    </div>
+                    <span style="font-size: 28px; font-weight: 900; color: white; line-height:1; font-family:monospace;">
+                        $<span id="total-amount">0</span>
+                    </span>
+                </div>
+                
+                <button id="btn-pay" class="btn-main" disabled onclick="CevicheTicketEngine.execPayment(event)">
+                    <i class="fa-solid fa-lock text-[12px]"></i> Autorizar Pago
+                </button>
+                
+                <div class="text-center" style="font-size: 9px; color: #555; font-family:monospace; font-weight:bold; letter-spacing:1px;">
+                    <i class="fas fa-shield-alt text-emerald-900"></i> PROTEGIDO POR WOMPI SECURE GATEWAY
+                </div>
             </div>
         </div>
     </div>
@@ -307,467 +492,559 @@
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script>
-    // === CONFIGURACIÓN GLOBAL ===
+// ==============================================================================
+// 🚀 KERNEL DE COMPRA CEVICHE OS (IIFE para prevenir Memory Dumps y XSS)
+// ==============================================================================
+const CevicheTicketEngine = (function() {
+    'use strict';
+
+    /* --- CONFIGURACIÓN CRÍTICA --- */
     const CONFIG = {
-        functionId: "{{ function.id }}",
+        functionId: "{{ function.id|force_escape }}",
         apiUrl: "/api/orders/orders/",
         csrfToken: document.querySelector('[name=csrfmiddlewaretoken]').value,
-        seatSpacing: 50 // Espacio entre sillas en píxeles
+        seatSpacing: 50,
+        colors: { primary: '#00E676', vip: '#FFD700', sold: '#2c2c2c' }
     };
 
-    // Estado del Mapa y Selección
-    let appState = {
+    /* --- MÁQUINA DE ESTADO INMUTABLE --- */
+    const State = {
         selectedSeats: [],
+        blocksIndex: {}, // Indexador para Camera Auto-Focus
         map: {
-            scale: 0.8,      // Zoom inicial
-            pointX: 100,     // Posición X inicial
-            pointY: 100,     // Posición Y inicial
+            scale: 0.8,
+            pointX: window.innerWidth / 2, // Centrar inicialmente
+            pointY: 200,
             panning: false,
-            startX: 0,
-            startY: 0
+            startX: 0, startY: 0
         }
     };
+    Object.seal(State);
 
-    document.addEventListener('DOMContentLoaded', () => {
-        setupCustomPhysicsEngine(); // 👈 NUEVO MOTOR
-        loadMapData();
-    });
+    /* --- CACHÉ DE DOM --- */
+    const R = {
+        container: document.getElementById('map-container'),
+        content: document.getElementById('seat-map-render'),
+        cartList: document.getElementById('cart-list'),
+        totalEl: document.getElementById('total-amount'),
+        pillTotalEl: document.getElementById('pill-total'),
+        sheetCountEl: document.getElementById('sheet-ticket-count'),
+        pillCountEl: document.getElementById('pill-count'),
+        btnPay: document.getElementById('btn-pay'),
+        emptyState: document.getElementById('empty-state'),
+        tooltip: document.getElementById('tooltip'),
+        zoneNav: document.getElementById('zone-navigator'),
+        cartSheet: document.getElementById('cart-sheet'),
+        floatingPill: document.getElementById('floating-cart-pill')
+    };
 
-    // =========================================================
-    // 🚀 1. MOTOR DE FÍSICA PERSONALIZADO (ZOOM SUAVE)
-    // =========================================================
-    function setupCustomPhysicsEngine() {
-        const container = document.getElementById('map-container');
-        const content = document.getElementById('seat-map-render');
-        
-        const MIN_SCALE = 0.2;
-        const MAX_SCALE = 5;
+    /* --- SANITIZADOR XSS FRONTEND --- */
+    const escapeHTML = (str) => {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    };
 
-        // Renderizado visual (Transform CSS)
-        function updateTransform() {
-            content.style.transform = `translate(${appState.map.pointX}px, ${appState.map.pointY}px) scale(${appState.map.scale})`;
-        }
+    /* =========================================================
+       1. MOTOR DE FÍSICA MULTI-TOUCH Y HÁPTICA
+    ========================================================= */
+    let initialPinchDist = null;
+    let initialScale = 1;
 
-        // A. ZOOM INTELIGENTE (RUEDA / TRACKPAD)
-        container.addEventListener('wheel', (e) => {
-            e.preventDefault(); // STOP al scroll de la página
+    function getPinchDistance(touches) {
+        return Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
+    }
 
-            // Coordenadas del mouse relativas al mapa (para hacer zoom hacia el puntero)
-            const rect = container.getBoundingClientRect();
+    function setupPhysics() {
+        const MIN_SCALE = 0.15;
+        const MAX_SCALE = 4;
+
+        // A. EVENTOS TÁCTILES (Mobile)
+        R.container.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 1) {
+                State.map.panning = true;
+                State.map.startX = e.touches[0].clientX - State.map.pointX;
+                State.map.startY = e.touches[0].clientY - State.map.pointY;
+                R.content.style.transition = 'none'; // Quitar lag
+            } else if (e.touches.length === 2) {
+                State.map.panning = false;
+                initialPinchDist = getPinchDistance(e.touches);
+                initialScale = State.map.scale;
+            }
+        }, { passive: false });
+
+        R.container.addEventListener('touchmove', (e) => {
+            if (e.touches.length === 1 && State.map.panning) {
+                e.preventDefault(); // Evitar scroll de la página web
+                State.map.pointX = e.touches[0].clientX - State.map.startX;
+                State.map.pointY = e.touches[0].clientY - State.map.startY;
+                applyTransform();
+            } else if (e.touches.length === 2 && initialPinchDist) {
+                e.preventDefault();
+                const dist = getPinchDistance(e.touches);
+                const scaleDelta = dist / initialPinchDist;
+                let newScale = initialScale * scaleDelta;
+                
+                if(newScale < MIN_SCALE) newScale = MIN_SCALE;
+                if(newScale > MAX_SCALE) newScale = MAX_SCALE;
+                
+                State.map.scale = newScale;
+                applyTransform();
+            }
+        }, { passive: false });
+
+        R.container.addEventListener('touchend', (e) => {
+            if (e.touches.length < 2) initialPinchDist = null;
+            if (e.touches.length === 0) {
+                State.map.panning = false;
+                R.content.style.transition = 'transform 0.2s cubic-bezier(0.19, 1, 0.22, 1)';
+            }
+        });
+
+        // B. EVENTOS MOUSE (Desktop)
+        R.container.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const rect = R.container.getBoundingClientRect();
             const mouseX = e.clientX - rect.left;
             const mouseY = e.clientY - rect.top;
 
-            // Calcular posición relativa dentro del sistema escalado
-            const xs = (mouseX - appState.map.pointX) / appState.map.scale;
-            const ys = (mouseY - appState.map.pointY) / appState.map.scale;
+            const xs = (mouseX - State.map.pointX) / State.map.scale;
+            const ys = (mouseY - State.map.pointY) / State.map.scale;
 
-            // DETECTOR DE TRACKPAD vs MOUSE
-            // Trackpads dan deltas pequeños (<100), Mouse wheels dan deltas grandes (>100)
-            let delta = -e.deltaY;
-            let factor = 0;
+            const isTrackpad = Math.abs(e.deltaY) < 50;
+            const factor = isTrackpad ? -e.deltaY * 0.01 : Math.sign(-e.deltaY) * 0.3;
 
-            if (Math.abs(delta) < 50) {
-                // Es un Trackpad: Movimiento suave y continuo
-                factor = delta * 0.01; 
-            } else {
-                // Es un Mouse Wheel: Movimiento por pasos
-                factor = Math.sign(delta) * 0.3;
-            }
-
-            const oldScale = appState.map.scale;
-            let newScale = oldScale + factor;
-
-            // Limitar Zoom (Clamp)
+            let newScale = State.map.scale + factor;
             if (newScale < MIN_SCALE) newScale = MIN_SCALE;
             if (newScale > MAX_SCALE) newScale = MAX_SCALE;
 
-            // Ajustar posición para mantener el mouse en el mismo punto relativo
-            appState.map.pointX -= xs * (newScale - oldScale);
-            appState.map.pointY -= ys * (newScale - oldScale);
-            appState.map.scale = newScale;
+            State.map.pointX -= xs * (newScale - State.map.scale);
+            State.map.pointY -= ys * (newScale - State.map.scale);
+            State.map.scale = newScale;
+            applyTransform();
+        }, { passive: false });
 
-            updateTransform();
-        }, { passive: false }); // 'passive: false' es obligatorio para e.preventDefault()
-
-        // B. ARRASTRE (PANNING)
-        container.addEventListener('mousedown', (e) => {
-            // Solo click izquierdo
+        R.container.addEventListener('mousedown', (e) => {
             if (e.button !== 0) return;
-            e.preventDefault();
-            appState.map.startX = e.clientX - appState.map.pointX;
-            appState.map.startY = e.clientY - appState.map.pointY;
-            appState.map.panning = true;
-            container.style.cursor = 'grabbing';
-            // Quitar transición CSS mientras arrastramos para rendimiento máximo
-            content.style.transition = 'none';
+            State.map.panning = true;
+            State.map.startX = e.clientX - State.map.pointX;
+            State.map.startY = e.clientY - State.map.pointY;
+            R.container.style.cursor = 'grabbing';
+            R.content.style.transition = 'none';
         });
 
         window.addEventListener('mousemove', (e) => {
-            if (!appState.map.panning) return;
-            e.preventDefault();
-            appState.map.pointX = e.clientX - appState.map.startX;
-            appState.map.pointY = e.clientY - appState.map.startY;
-            updateTransform();
+            if (!State.map.panning) return;
+            State.map.pointX = e.clientX - State.map.startX;
+            State.map.pointY = e.clientY - State.map.startY;
+            applyTransform();
         });
 
         window.addEventListener('mouseup', () => {
-            if (appState.map.panning) {
-                appState.map.panning = false;
-                container.style.cursor = 'grab';
-                // Restaurar transición suave
-                content.style.transition = 'transform 0.1s cubic-bezier(0.1, 0.7, 1.0, 0.1)';
+            if (State.map.panning) {
+                State.map.panning = false;
+                R.container.style.cursor = 'grab';
+                R.content.style.transition = 'transform 0.2s cubic-bezier(0.19, 1, 0.22, 1)';
             }
         });
 
-        // C. CONTROLES DE BOTONES
-        window.zoomManual = (direction) => {
-            const rect = container.getBoundingClientRect();
-            // Zoom al centro del contenedor
-            const centerX = rect.width / 2;
-            const centerY = rect.height / 2;
-            
-            const xs = (centerX - appState.map.pointX) / appState.map.scale;
-            const ys = (centerY - appState.map.pointY) / appState.map.scale;
-            
-            const factor = direction * 0.4;
-            let newScale = appState.map.scale + factor;
-            
-            if (newScale < MIN_SCALE) newScale = MIN_SCALE;
-            if (newScale > MAX_SCALE) newScale = MAX_SCALE;
-
-            appState.map.pointX -= xs * (newScale - appState.map.scale);
-            appState.map.pointY -= ys * (newScale - appState.map.scale);
-            appState.map.scale = newScale;
-            updateTransform();
-        };
-
-        window.resetMap = () => {
-            appState.map.scale = 0.8;
-            appState.map.pointX = 100;
-            appState.map.pointY = 100;
-            updateTransform();
-        };
-
-        // Bindear botones HTML a funciones
-        document.getElementById('zoom-in').onclick = () => zoomManual(1);
-        document.getElementById('zoom-out').onclick = () => zoomManual(-1);
-        document.getElementById('zoom-reset').onclick = resetMap;
-
-        // Inicializar
-        updateTransform();
+        // C. BOTONES MANUALES
+        document.getElementById('zoom-in').onclick = () => zoomToPoint(R.container.clientWidth/2, R.container.clientHeight/2, 0.5);
+        document.getElementById('zoom-out').onclick = () => zoomToPoint(R.container.clientWidth/2, R.container.clientHeight/2, -0.5);
+        document.getElementById('zoom-reset').onclick = autoFitMap;
     }
 
-    // =========================================================
-    // 🎨 2. RENDERIZADO DEL MAPA
-    // =========================================================
+    function applyTransform() {
+        R.content.style.transform = `translate(${State.map.pointX}px, ${State.map.pointY}px) scale(${State.map.scale})`;
+    }
+
+    function zoomToPoint(x, y, delta) {
+        const xs = (x - State.map.pointX) / State.map.scale;
+        const ys = (y - State.map.pointY) / State.map.scale;
+        let newScale = State.map.scale + delta;
+        if (newScale < 0.15) newScale = 0.15;
+        if (newScale > 4) newScale = 4;
+
+        State.map.pointX -= xs * (newScale - State.map.scale);
+        State.map.pointY -= ys * (newScale - State.map.scale);
+        State.map.scale = newScale;
+        applyTransform();
+    }
+
+    /* =========================================================
+       2. RENDERIZADO BIG-O OPTIMIZADO & CAMERA AUTO-FIT
+    ========================================================= */
     function loadMapData() {
         const rawJson = '{{ venue_layout_json|safe }}';
-        const container = document.getElementById('seat-map-render');
         
         try {
-            // Si viene vacío o null
-            if (!rawJson || rawJson === '[]' || rawJson === '{}') {
-                throw new Error("Mapa vacío");
-            }
-
+            if (!rawJson || rawJson === '[]' || rawJson === '{}') throw new Error();
             const data = JSON.parse(rawJson);
-            
-            // Limpiar loader
+            if (!data.blocks || data.blocks.length === 0) throw new Error();
+
             const loader = document.getElementById('loading-msg');
             if(loader) loader.remove();
 
-            if (!data.blocks) return;
+            // Usamos Fragmento para inyectar todo en el DOM de golpe y evitar Lag O(n)
+            const fragment = document.createDocumentFragment();
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 
-            // DIBUJAR BLOQUES
-            data.blocks.forEach(block => {
-                // Crear Grupo Visual para el bloque
+            data.blocks.forEach((block, idx) => {
                 const blockGroup = document.createElement('div');
                 blockGroup.style.position = 'absolute';
                 blockGroup.style.left = `${block.x}px`;
                 blockGroup.style.top = `${block.y}px`;
                 blockGroup.style.transform = `rotate(${block.rotation || 0}deg)`;
                 
-                // Nombre del Bloque (Zona)
+                const safeName = escapeHTML(block.name || `Zona ${idx+1}`);
+                
                 if (block.name) {
                     const label = document.createElement('div');
                     label.className = 'block-label';
-                    label.innerText = block.name;
-                    label.style.top = '-50px'; // Un poco arriba de las sillas
+                    label.innerText = safeName;
+                    label.style.top = '-60px'; 
                     blockGroup.appendChild(label);
                 }
 
-                // DIBUJAR SILLAS
+                let bMinX = Infinity, bMinY = Infinity, bMaxX = -Infinity, bMaxY = -Infinity;
+
                 if (block.seats) {
                     block.seats.forEach(seat => {
                         const posX = seat.localX * CONFIG.seatSpacing;
                         const posY = seat.localY * CONFIG.seatSpacing;
 
-                        // Parseo de precio robusto
-                        let finalPrice = 0;
-                        if (seat.price !== undefined && seat.price !== null) {
-                            finalPrice = parseFloat(seat.price);
-                        }
+                        const absX = block.x + posX;
+                        const absY = block.y + posY;
+                        if(absX < minX) minX = absX; if(absX > maxX) maxX = absX;
+                        if(absY < minY) minY = absY; if(absY > maxY) maxY = absY;
+                        
+                        if(posX < bMinX) bMinX = posX; if(posX > bMaxX) bMaxX = posX;
+                        if(posY < bMinY) bMinY = posY; if(posY > bMaxY) bMaxY = posY;
+
+                        const finalPrice = (seat.price !== undefined && seat.price !== null) ? parseFloat(seat.price) : 0;
+                        const safeType = escapeHTML(seat.category || seat.type || 'General');
 
                         const seatEl = createSeatElement({
-                            id: seat.id || `${seat.row}-${seat.num}`, // Fallback ID
-                            label: `${seat.row}-${seat.num}`,
-                            row: seat.row,
-                            num: seat.num,
-                            type: seat.category || seat.type || 'General',
+                            id: escapeHTML(seat.id || `${seat.row}-${seat.num}`),
+                            row: escapeHTML(seat.row),
+                            num: escapeHTML(seat.num),
+                            type: safeType,
                             price: finalPrice,
-                            status: seat.status || 'available',
-                            x: posX,
-                            y: posY
+                            status: escapeHTML(seat.status || 'available'),
+                            x: posX, y: posY
                         });
-
                         blockGroup.appendChild(seatEl);
                     });
                 }
+                
+                State.blocksIndex[idx] = {
+                    name: safeName,
+                    cx: block.x + (bMinX + bMaxX)/2,
+                    cy: block.y + (bMinY + bMaxY)/2,
+                    w: Math.abs(bMaxX - bMinX),
+                    h: Math.abs(bMaxY - bMinY)
+                };
 
-                container.appendChild(blockGroup);
+                const navBtn = document.createElement('button');
+                navBtn.className = 'zone-btn';
+                navBtn.innerHTML = `<i class="fa-solid fa-crosshairs mr-1"></i> ${safeName}`;
+                navBtn.onclick = () => focusCameraOnBlock(idx);
+                R.zoneNav.appendChild(navBtn);
+
+                fragment.appendChild(blockGroup);
             });
 
+            R.content.appendChild(fragment);
+
+            State.map.bounds = { minX, minY, maxX, maxY };
+            setTimeout(autoFitMap, 100);
+
         } catch(e) {
-            console.error("Error cargando mapa:", e);
-            container.innerHTML = `
-                <div class="text-center p-5 text-muted" style="position:absolute; top:200px; left:200px; width:300px;">
-                    <i class="fas fa-exclamation-circle fa-3x mb-3"></i><br>
-                    No hay mapa disponible para este evento.
+            console.error("Kernel Log:", e);
+            R.content.innerHTML = `
+                <div class="text-center p-5 text-muted" style="position:absolute; left: 50vw; top: 50vh; transform:translate(-50%, -50%); width:300px;">
+                    <i class="fas fa-exclamation-triangle fa-3x mb-3 text-red-500"></i><br>
+                    <span class="font-mono text-xs text-red-400">ANOMALÍA ESTRUCTURAL: TOPOLOGÍA VACÍA</span>
                 </div>`;
         }
     }
 
-    // =========================================================
-    // 💺 3. CREACIÓN DE SILLA (DOM)
-    // =========================================================
     function createSeatElement(data) {
         const el = document.createElement('div');
-        
-        // Clases CSS dinámicas
         let classes = ['seat'];
         
-        // Detección de VIP (insensible a mayúsculas/minúsculas)
-        const typeStr = (data.type || '').toLowerCase();
-        if(typeStr.includes('vip') || typeStr.includes('preferencial')) {
-            classes.push('vip');
-        }
-
-        if(data.status === 'sold' || data.status === 'unavailable') {
-            classes.push('sold');
-        }
+        const tStr = data.type.toLowerCase();
+        if(tStr.includes('vip') || tStr.includes('preferencial')) classes.push('vip');
+        if(data.status === 'sold' || data.status === 'unavailable') classes.push('sold');
         
         el.className = classes.join(' ');
-
-        // Posición Absoluta
         el.style.left = `${data.x}px`;
         el.style.top = `${data.y}px`;
-
-        // Datos internos
         el.dataset.id = data.id;
-        el.innerText = data.num; // Número visible en la silla
+        el.innerText = data.num; 
 
-        // Eventos
-        // Usamos 'click' estándar porque el motor de física maneja el drag
         el.addEventListener('click', (e) => {
-            e.stopPropagation(); // Evitar que el click pase al mapa
+            e.stopPropagation(); 
             handleSeatClick(el, data);
         });
 
-        el.addEventListener('mouseenter', (e) => showTooltip(e, data));
-        el.addEventListener('mouseleave', hideTooltip);
+        if (window.innerWidth > 768) {
+            el.addEventListener('mouseenter', (e) => showTooltip(e, data));
+            el.addEventListener('mouseleave', hideTooltip);
+        }
 
         return el;
     }
 
-    // =========================================================
-    // 🛒 4. LÓGICA DE CARRITO Y SELECCIÓN
-    // =========================================================
+    /* =========================================================
+       3. SISTEMA DE CÁMARA INTELIGENTE (Auto-Fit & Focus)
+    ========================================================= */
+    function autoFitMap() {
+        if(!State.map.bounds) return;
+        const { minX, minY, maxX, maxY } = State.map.bounds;
+        const w = maxX - minX + 200; 
+        const h = maxY - minY + 200;
+        
+        const vpW = R.container.clientWidth;
+        const vpH = R.container.clientHeight;
+        
+        let scaleX = vpW / w;
+        let scaleY = vpH / h;
+        let finalScale = Math.min(scaleX, scaleY);
+        
+        if (finalScale > 1.2) finalScale = 1.2; 
+        if (finalScale < 0.15) finalScale = 0.15;
+
+        State.map.scale = finalScale;
+        State.map.pointX = (vpW / 2) - ((minX + maxX) / 2) * finalScale;
+        State.map.pointY = (vpH / 2) - ((minY + maxY) / 2) * finalScale;
+        
+        applyTransform();
+    }
+
+    function focusCameraOnBlock(idx) {
+        const block = State.blocksIndex[idx];
+        if(!block) return;
+
+        const vpW = R.container.clientWidth;
+        const vpH = R.container.clientHeight;
+        let focusScale = 1; 
+        
+        State.map.scale = focusScale;
+        State.map.pointX = (vpW / 2) - (block.cx * focusScale);
+        State.map.pointY = (vpH / 2) - (block.cy * focusScale);
+        
+        applyTransform();
+    }
+
+    /* =========================================================
+       4. LÓGICA DE SELECCIÓN Y CARRITO INVERSO (Bottom Sheet)
+    ========================================================= */
     function handleSeatClick(el, data) {
-        if(el.classList.contains('sold')) return;
+        if(el.classList.contains('sold')) {
+            showTooltipAction(el, "Asiento Ocupado");
+            return;
+        }
 
         const id = data.id;
-        const exists = appState.selectedSeats.find(s => s.id === id);
+        const exists = State.selectedSeats.find(s => s.id === id);
 
         if(exists) {
-            // Deseleccionar
             el.classList.remove('selected');
-            appState.selectedSeats = appState.selectedSeats.filter(s => s.id !== id);
+            State.selectedSeats = State.selectedSeats.filter(s => s.id !== id);
         } else {
-            // Validaciones
-            if(appState.selectedSeats.length >= 10) {
-                Swal.fire({
-                    icon: 'warning', 
-                    title: 'Límite Alcanzado', 
-                    text: 'Máximo 10 boletas por compra.',
-                    background: '#222', color: '#fff'
-                });
+            if(State.selectedSeats.length >= 10) {
+                Swal.fire({ icon: 'warning', title: 'Límite de Seguridad', text: 'El clúster restringe un máximo de 10 tickets por transacción.', background: '#0a0a0c', color: '#fff' });
                 return;
             }
-            if(data.price <= 0) {
-                // Opcional: Permitir gratis o mostrar alerta
-                // Por ahora permitimos, pero podría ser un error de configuración
-            }
-
-            // Seleccionar
             el.classList.add('selected');
-            appState.selectedSeats.push(data);
+            State.selectedSeats.push(data);
+            
+            // Retroalimentación visual en la Píldora
+            if(window.innerWidth < 992) pulsePill();
         }
         renderCart();
     }
 
     function renderCart() {
-        const list = document.getElementById('cart-list');
-        const totalEl = document.getElementById('total-amount');
-        const btn = document.getElementById('btn-pay');
-        const empty = document.getElementById('empty-state');
-
-        list.innerHTML = '';
+        R.cartList.innerHTML = '';
         let total = 0;
 
-        if(appState.selectedSeats.length === 0) {
-            list.appendChild(empty);
-            totalEl.innerText = '0';
-            btn.disabled = true;
+        if(State.selectedSeats.length === 0) {
+            R.cartList.appendChild(R.emptyState);
+            R.totalEl.innerText = '0';
+            R.sheetCountEl.innerText = '0';
+            R.pillCountEl.innerText = '0';
+            R.pillTotalEl.innerText = '$0';
+            R.btnPay.disabled = true;
+            
+            // Ocultar Píldora y Cerrar Cart
+            R.floatingPill.classList.remove('visible');
+            if(R.cartSheet.classList.contains('expanded')) toggleCartSheet();
             return;
         }
 
-        // Ordenar: Primero Fila, luego Número
-        appState.selectedSeats.sort((a,b) => {
+        State.selectedSeats.sort((a,b) => {
             if(a.row === b.row) return parseInt(a.num) - parseInt(b.num);
             return a.row.localeCompare(b.row);
         });
 
-        appState.selectedSeats.forEach(seat => {
+        State.selectedSeats.forEach(seat => {
             total += seat.price;
             
             const row = document.createElement('div');
             row.className = 'ticket-row';
             row.innerHTML = `
                 <div>
-                    <div style="font-weight:700; color:white; font-size:14px;">
-                        <span style="color:#666">FILA</span> ${seat.row} - <span style="color:#666">SILLA</span> ${seat.num}
+                    <div style="font-weight:900; color:white; font-size:14px; font-family:monospace;">
+                        <span style="color:#666">FILA</span> ${seat.row} <span style="color:#666">N°</span> ${seat.num}
                     </div>
-                    <small style="color:var(--color-primary); font-size:11px; text-transform:uppercase;">
+                    <small style="color:var(--color-primary); font-size:10px; font-weight:bold; letter-spacing:1px; text-transform:uppercase;">
                         ${seat.type}
                     </small>
                 </div>
                 <div style="text-align:right;">
-                    <div style="color:white; font-weight:bold;">$${seat.price.toLocaleString()}</div>
-                    <i class="fas fa-trash-alt text-danger" style="cursor:pointer; font-size:12px; margin-top:5px;" onclick="removeSeat('${seat.id}')"></i>
+                    <div style="color:white; font-weight:900; font-family:monospace; font-size:14px;">$${seat.price.toLocaleString()}</div>
+                    <button class="remove-btn" style="background:transparent; border:none; color:#ef4444; font-size:10px; margin-top:2px; font-weight:bold; cursor:pointer;"><i class="fas fa-times-circle"></i> REMOVER</button>
                 </div>
             `;
-            // Necesitamos un helper global para el onclick inline, 
-            // o mejor, añadir el evento programáticamente:
-            row.querySelector('.fa-trash-alt').onclick = (e) => {
+            
+            row.querySelector('.remove-btn').onclick = (e) => {
                 e.stopPropagation();
-                // Simular click en la silla del mapa para deseleccionar
                 const seatMapEl = document.querySelector(`.seat[data-id="${seat.id}"]`);
                 if(seatMapEl) seatMapEl.click();
             };
 
-            list.appendChild(row);
+            R.cartList.appendChild(row);
         });
 
-        totalEl.innerText = total.toLocaleString();
-        btn.disabled = false;
+        const totalStr = total.toLocaleString();
+        R.totalEl.innerText = totalStr;
+        R.pillTotalEl.innerText = `$${totalStr}`;
+        R.sheetCountEl.innerText = State.selectedSeats.length;
+        R.pillCountEl.innerText = State.selectedSeats.length;
+        R.btnPay.disabled = false;
+
+        // Mostrar Píldora si hay elementos
+        if(window.innerWidth < 992) {
+            R.floatingPill.classList.add('visible');
+        }
     }
 
-    // =========================================================
-    // ℹ️ 5. TOOLTIPS
-    // =========================================================
-    const tooltip = document.getElementById('tooltip');
-    
+    /* Interacciones del Bottom Sheet (Mobile) */
+    function toggleCartSheet() {
+        if (window.innerWidth >= 992) return;
+        R.cartSheet.classList.toggle('expanded');
+    }
+
+    function pulsePill() {
+        R.floatingPill.style.transform = 'translateX(-50%) scale(1.1)';
+        setTimeout(() => {
+            R.floatingPill.style.transform = 'translateX(-50%) scale(1)';
+        }, 200);
+    }
+
+    /* =========================================================
+       5. TOOLTIPS (Desktop Only) & FEEDBACK NATIVO
+    ========================================================= */
     function showTooltip(e, data) {
-        const priceDisplay = data.price > 0 ? `$${data.price.toLocaleString()}` : 'No disponible';
+        const priceDisplay = data.price > 0 ? `$${data.price.toLocaleString()}` : 'No Asignado';
         
-        tooltip.style.display = 'block';
-        tooltip.innerHTML = `
-            <div style="color:var(--color-primary); font-weight:800; text-transform:uppercase; margin-bottom:2px;">
+        R.tooltip.style.display = 'block';
+        R.tooltip.innerHTML = `
+            <div style="color:var(--color-primary); font-weight:900; text-transform:uppercase; margin-bottom:2px; letter-spacing:1px; font-size:9px;">
                 ${data.type}
             </div>
-            <div style="font-size:13px; margin-bottom:2px;">
-                Fila <b>${data.row}</b> - Silla <b>${data.num}</b>
+            <div style="font-size:14px; font-weight:bold; margin-bottom:4px; font-family:monospace;">
+                ${data.row}-${data.num}
             </div>
-            <div style="font-weight:bold; color:#fff; border-top:1px solid #444; padding-top:2px; margin-top:2px;">
+            <div style="font-weight:900; color:#fff; border-top:1px dashed #444; padding-top:4px; font-family:monospace; font-size:12px;">
                 ${priceDisplay}
             </div>
         `;
-        // Posicionar tooltip inicialmente
         moveTooltip(e);
     }
     
     function moveTooltip(e) {
-        // Offset simple
-        tooltip.style.left = (e.clientX + 15) + 'px';
-        tooltip.style.top = (e.clientY + 15) + 'px';
+        R.tooltip.style.left = (e.clientX + 15) + 'px';
+        R.tooltip.style.top = (e.clientY + 15) + 'px';
     }
     
-    function hideTooltip() { 
-        tooltip.style.display = 'none'; 
+    function hideTooltip() { R.tooltip.style.display = 'none'; }
+
+    // Feedback en móvil al tocar bloqueado
+    function showTooltipAction(el, msg) {
+        const rect = el.getBoundingClientRect();
+        const msgEl = document.createElement('div');
+        msgEl.className = 'fixed bg-red-600 text-white font-bold px-2 py-1 rounded text-[9px] uppercase pointer-events-none z-[9999] shadow-lg transition-all duration-500';
+        msgEl.innerText = msg;
+        msgEl.style.left = Math.max(10, rect.left) + 'px';
+        msgEl.style.top = (rect.top - 25) + 'px';
+        document.body.appendChild(msgEl);
+        
+        setTimeout(() => { msgEl.style.opacity = '0'; msgEl.style.transform = 'translateY(-20px)'; }, 50);
+        setTimeout(() => msgEl.remove(), 600);
     }
 
     document.addEventListener('mousemove', (e) => {
-        if(tooltip.style.display === 'block') moveTooltip(e);
+        if(R.tooltip.style.display === 'block') moveTooltip(e);
     });
 
-    // =========================================================
-    // 💳 6. INTEGRACIÓN PAGOS (WOMPI)
-    // =========================================================
-    document.getElementById('btn-pay').addEventListener('click', async () => {
-        const btn = document.getElementById('btn-pay');
-        
-        // Bloquear botón
-        btn.disabled = true;
-        const originalText = btn.innerText;
-        btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> PROCESANDO...';
+    /* =========================================================
+       6. INTEGRACIÓN WAF Y PAGOS (WOMPI)
+    ========================================================= */
+    function execPayment(e) {
+        e.stopPropagation(); 
+        R.btnPay.disabled = true;
+        const originalText = R.btnPay.innerHTML;
+        R.btnPay.innerHTML = '<i class="fas fa-circle-notch fa-spin text-lg"></i> ENCRIPTANDO...';
 
-        try {
-            // 1. Crear Orden en Backend
-            const res = await fetch(CONFIG.apiUrl, {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json', 
-                    'X-CSRFToken': CONFIG.csrfToken 
-                },
-                body: JSON.stringify({
-                    function_id: CONFIG.functionId,
-                    seat_labels: appState.selectedSeats.map(s => s.label),
-                    products: [] // Futura expansión para combos
-                })
-            });
-
-            const json = await res.json();
-
-            if(!res.ok) {
-                throw new Error(json.error || 'Error al crear la orden');
-            }
-
-            // 2. Redirigir a Wompi Checkout
-            // Construcción segura de URL
+        fetch(CONFIG.apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CONFIG.csrfToken },
+            body: JSON.stringify({
+                function_id: CONFIG.functionId,
+                seat_labels: State.selectedSeats.map(s => s.label),
+                products: [] 
+            })
+        })
+        .then(res => res.json().then(data => ({ok: res.ok, data})))
+        .then(res => {
+            if(!res.ok) throw new Error(res.data.error || 'Negación del procesador de pagos');
+            
+            // Redirigir a Wompi Checkout de forma segura
             const wompiUrl = new URL("https://checkout.wompi.co/p/");
-            wompiUrl.searchParams.append("public-key", json.wompi_public_key);
-            wompiUrl.searchParams.append("currency", json.wompi_currency);
-            wompiUrl.searchParams.append("amount-in-cents", json.amount_in_cents);
-            wompiUrl.searchParams.append("reference", json.reference);
-            wompiUrl.searchParams.append("signature:integrity", json.wompi_signature);
-            wompiUrl.searchParams.append("redirect-url", `${window.location.origin}/orders/${json.id}/status`);
+            wompiUrl.searchParams.append("public-key", res.data.wompi_public_key);
+            wompiUrl.searchParams.append("currency", res.data.wompi_currency);
+            wompiUrl.searchParams.append("amount-in-cents", res.data.amount_in_cents);
+            wompiUrl.searchParams.append("reference", res.data.reference);
+            wompiUrl.searchParams.append("signature:integrity", res.data.wompi_signature);
+            wompiUrl.searchParams.append("redirect-url", `${window.location.origin}/orders/${res.data.id}/status`);
 
             window.location.href = wompiUrl.toString();
-
-        } catch (err) {
+        })
+        .catch(err => {
             console.error(err);
-            Swal.fire({
-                icon: 'error', 
-                title: 'No se pudo iniciar el pago', 
-                text: err.message, 
-                background: '#222', color: '#fff'
-            });
-            
-            // Restaurar botón
-            btn.disabled = false;
-            btn.innerText = originalText;
-        }
-    });
+            Swal.fire({ icon: 'error', title: 'Transacción Bloqueada', text: err.message, background: '#0a0a0c', color: '#fff', confirmButtonColor: '#ef4444' });
+            R.btnPay.disabled = false;
+            R.btnPay.innerHTML = originalText;
+        });
+    }
+
+    /* --- EXPOSICIÓN DE API PÚBLICA --- */
+    return {
+        init: () => {
+            setupPhysics();
+            loadMapData();
+        },
+        toggleCart: toggleCartSheet,
+        execPayment: execPayment
+    };
+
+})();
+
+// Arrancar Kernel
+document.addEventListener('DOMContentLoaded', CevicheTicketEngine.init);
 
 </script>
 {% endblock %}
