@@ -20,7 +20,7 @@
         --color-bg: #030305;      
         --color-surface: #0a0a0c; 
         --color-glass: rgba(10, 10, 12, 0.85);
-        --seat-size: 36px;        /* Tamaño Touch-Friendly (Apple Standards) */
+        --seat-size: 36px;        
         
         --safe-top: env(safe-area-inset-top, 0px);
         --safe-bottom: env(safe-area-inset-bottom, 16px);
@@ -29,8 +29,8 @@
     body {
         font-family: 'Inter', sans-serif;
         background-color: var(--color-bg);
-        overflow: hidden; /* Control estricto de pantalla para App-Like Feel */
-        overscroll-behavior: none; /* Bloquea el "Pull to Refresh" nativo en móviles */
+        overflow: hidden; 
+        overscroll-behavior: none; 
         color: white;
         margin: 0;
         padding: 0;
@@ -59,7 +59,7 @@
             radial-gradient(circle at 50% 50%, rgba(0, 230, 118, 0.02) 0%, transparent 60%);
         background-size: 30px 30px, 100% 100%;
         overflow: hidden; 
-        touch-action: none; /* VITAL: Bloquea scroll nativo para habilitar Pinch-to-Zoom */
+        touch-action: none; 
         user-select: none;
         -webkit-user-select: none;
         cursor: grab;
@@ -72,10 +72,8 @@
         width: 0; height: 0;
         transform-origin: 0 0; 
         will-change: transform; 
-        /* Transición suave regulada por JS para no interferir con Drag/Pinch */
     }
 
-    /* Smart Zone Nav (Mobile Top Nav) */
     .zone-navigator {
         position: absolute;
         top: calc(16px + var(--safe-top));
@@ -86,8 +84,8 @@
         gap: 8px;
         overflow-x: auto;
         z-index: 200;
-        -ms-overflow-style: none;  /* IE and Edge */
-        scrollbar-width: none;  /* Firefox */
+        -ms-overflow-style: none;  
+        scrollbar-width: none;  
     }
     .zone-navigator::-webkit-scrollbar { display: none; }
     
@@ -126,7 +124,7 @@
         box-shadow: 0 4px 0 #111, inset 0 2px 4px rgba(255,255,255,0.1);
         z-index: 10;
         transform: translate(-50%, -50%); 
-        touch-action: manipulation; /* Remueve 300ms delay en móviles */
+        touch-action: manipulation; 
     }
 
     .seat:hover:not(.sold) {
@@ -174,7 +172,7 @@
     ========================================================================== */
     .map-controls {
         position: absolute;
-        bottom: calc(80px + var(--safe-bottom)); /* Arriba de la Píldora Flotante */
+        bottom: calc(80px + var(--safe-bottom)); 
         right: 16px;
         display: flex;
         flex-direction: column;
@@ -218,15 +216,13 @@
     .dot { width: 12px; height: 12px; border-radius: 4px; }
 
     /* ==========================================================================
-       5. 🚀 GOD-TIER CHECKOUT: PÍLDORA FLOTANTE & BOTTOM SHEET NATIVO
+       5. PÍLDORA FLOTANTE & BOTTOM SHEET NATIVO
     ========================================================================== */
-    
-    /* Píldora Flotante (Botón Central en el Lienzo) */
     .floating-cart-pill {
         position: absolute;
         bottom: calc(20px + var(--safe-bottom));
         left: 50%;
-        transform: translateX(-50%) translateY(100px); /* Oculto inicialmente abajo */
+        transform: translateX(-50%) translateY(100px); 
         background: rgba(10, 10, 12, 0.95);
         backdrop-filter: blur(15px);
         border: 1px solid rgba(0, 230, 118, 0.4);
@@ -258,37 +254,21 @@
         display: flex; align-items: center; justify-content: center;
         font-size: 12px;
     }
+    .pill-text { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; }
+    .pill-total { font-size: 14px; font-family: monospace; font-weight: 900; color: var(--color-primary); }
 
-    .pill-text {
-        font-size: 12px;
-        font-weight: 800;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-    }
+    @media (min-width: 992px) { .floating-cart-pill { display: none !important; } }
 
-    .pill-total {
-        font-size: 14px;
-        font-family: monospace;
-        font-weight: 900;
-        color: var(--color-primary);
-    }
-
-    @media (min-width: 992px) {
-        .floating-cart-pill { display: none !important; }
-    }
-
-    /* Contenedor del Carrito Desplegable */
     .sidebar-section {
         position: fixed;
         top: 0; left: 0; right: 0; bottom: 0;
         z-index: 300;
-        pointer-events: none; /* Invisible hasta que se abra */
+        pointer-events: none; 
         display: flex;
         flex-direction: column;
         justify-content: flex-end;
     }
 
-    /* Backdrop Oscuro del Móvil */
     .mobile-cart-backdrop {
         position: absolute;
         inset: 0;
@@ -298,29 +278,25 @@
         transition: opacity 0.3s;
     }
 
-    /* La Caja de los Tickets (Desliza desde abajo) */
     .cart-details-wrapper {
         background: var(--color-surface);
         border-top-left-radius: 24px;
         border-top-right-radius: 24px;
         box-shadow: 0 -10px 50px rgba(0,0,0,0.9);
-        pointer-events: auto; /* Restaura eventos táctiles aquí */
+        pointer-events: auto; 
         display: flex; flex-direction: column;
         width: 100%;
         position: relative;
         z-index: 10;
-        
         transform: translateY(100%);
         transition: transform 0.4s cubic-bezier(0.19, 1, 0.22, 1);
-        max-height: 85vh; /* Ocupa hasta el 85% de la pantalla */
+        max-height: 85vh; 
     }
     
-    /* Estados Activos */
     .sidebar-section.expanded { pointer-events: auto; }
     .sidebar-section.expanded .mobile-cart-backdrop { opacity: 1; }
     .sidebar-section.expanded .cart-details-wrapper { transform: translateY(0); }
 
-    /* Estructura Interna del Carrito */
     .cart-header-mobile {
         display: flex; justify-content: space-between; align-items: center;
         padding: 20px 24px; border-bottom: 1px solid rgba(255,255,255,0.05);
@@ -341,7 +317,6 @@
     }
     @keyframes slideIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
 
-    /* 💳 Área del Botón de Pago */
     .checkout-area {
         background: rgba(10,10,12,0.98);
         backdrop-filter: blur(20px);
@@ -349,6 +324,14 @@
         border-top: 1px solid rgba(255,255,255,0.05);
         display: flex; flex-direction: column; gap: 12px;
         z-index: 310;
+    }
+
+    /* 🛡️ Contenedor del Mercado Pago Brick (Incrustado) */
+    #payment-brick-container {
+        display: none;
+        flex: 1;
+        overflow-y: auto;
+        padding: 10px 20px;
     }
 
     .btn-main {
@@ -364,7 +347,6 @@
     .btn-main:active:not(:disabled) { transform: translateY(0) scale(0.98); }
     .btn-main:disabled { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.2); box-shadow: none; cursor: not-allowed; }
 
-    /* Desktop Layout Rules (Overrides the Mobile Focus) */
     @media (min-width: 992px) {
         .sidebar-section {
             position: relative; width: 400px;
@@ -383,7 +365,6 @@
         .checkout-area { padding: 24px 30px; }
     }
 
-    /* Tooltip Nativo (Desktop) */
     #tooltip {
         position: fixed; background: rgba(0,0,0,0.9); color: white; padding: 10px 14px;
         border-radius: 8px; font-size: 11px; pointer-events: none; display: none; z-index: 9999;
@@ -400,8 +381,7 @@
     
     <div class="map-section" id="map-container">
         
-        <div class="zone-navigator" id="zone-navigator">
-            </div>
+        <div class="zone-navigator" id="zone-navigator"></div>
 
         <div id="seat-map-render">
             <div id="loading-msg" class="text-center" style="position:absolute; left: 50vw; top: 50vh; transform:translate(-50%, -50%); width: 250px;">
@@ -442,44 +422,49 @@
                 <button class="cart-close-btn" onclick="CevicheTicketEngine.toggleCart()"><i class="fa-solid fa-xmark"></i></button>
             </div>
 
-            <div class="event-info">
-                <h5 style="color: var(--color-primary); text-transform:uppercase; font-size:10px; letter-spacing:2px; font-weight:900; margin-bottom:8px;">Booking Asegurado</h5>
-                <h2 style="font-size: 1.4rem; color: white; margin: 0; font-weight: 900; line-height: 1.1;">{{ event_name|default:"Evento en Vivo" }}</h2>
-                <div style="font-size: 11px; margin-top: 12px; color: #888; font-family: monospace;" class="flex flex-col gap-1">
-                    <span class="text-white"><i class="far fa-calendar-alt text-[10px] mr-1"></i> {{ function.date_time|date:"l d F, Y" }}</span>
-                    <span><i class="fas fa-map-marker-alt text-[10px] mr-1"></i> {{ venue.name|default:"Ubicación Central" }}</span>
-                    <span><i class="far fa-clock text-[10px] mr-1"></i> {{ function.date_time|date:"h:i A" }}</span>
-                </div>
-            </div>
-
-            <div class="tickets-scroll" id="cart-list">
-                <div class="text-center" id="empty-state" style="padding-top: 40px; opacity: 0.3;">
-                    <i class="fas fa-ticket-alt fa-3x mb-4"></i>
-                    <p style="font-size:12px; font-weight:600;">Tu bóveda de tickets está vacía.<br>Toca las sillas para reservar.</p>
-                </div>
-            </div>
-
-            <div class="checkout-area">
-                <div style="display:flex; justify-content:space-between; align-items:flex-end;">
-                    <div style="display:flex; flex-direction:column;">
-                        <span style="font-size: 10px; color:#aaa; font-weight:800; text-transform:uppercase; letter-spacing:1px; display:flex; align-items:center; gap:6px;">
-                            Total a Pagar
-                        </span>
-                        <span style="font-size: 11px; color:var(--color-primary); font-family:monospace; font-weight:bold;"><span id="sheet-ticket-count">0</span> Tickets</span>
+            <div id="cart-ui-wrapper" style="display:flex; flex-direction:column; flex:1;">
+                <div class="event-info">
+                    <h5 style="color: var(--color-primary); text-transform:uppercase; font-size:10px; letter-spacing:2px; font-weight:900; margin-bottom:8px;">Booking Asegurado</h5>
+                    <h2 style="font-size: 1.4rem; color: white; margin: 0; font-weight: 900; line-height: 1.1;">{{ event_name|default:"Evento en Vivo" }}</h2>
+                    <div style="font-size: 11px; margin-top: 12px; color: #888; font-family: monospace;" class="flex flex-col gap-1">
+                        <span class="text-white"><i class="far fa-calendar-alt text-[10px] mr-1"></i> {{ function.date_time|date:"l d F, Y" }}</span>
+                        <span><i class="fas fa-map-marker-alt text-[10px] mr-1"></i> {{ venue.name|default:"Ubicación Central" }}</span>
+                        <span><i class="far fa-clock text-[10px] mr-1"></i> {{ function.date_time|date:"h:i A" }}</span>
                     </div>
-                    <span style="font-size: 28px; font-weight: 900; color: white; line-height:1; font-family:monospace;">
-                        $<span id="total-amount">0</span>
-                    </span>
                 </div>
-                
-                <button id="btn-pay" class="btn-main" disabled onclick="CevicheTicketEngine.execPayment(event)">
-                    <i class="fa-solid fa-lock text-[12px]"></i> Autorizar Pago
-                </button>
-                
-                <div class="text-center" style="font-size: 9px; color: #555; font-family:monospace; font-weight:bold; letter-spacing:1px;">
-                    <i class="fas fa-shield-alt text-emerald-900"></i> PROTEGIDO POR WOMPI SECURE GATEWAY
+
+                <div class="tickets-scroll" id="cart-list">
+                    <div class="text-center" id="empty-state" style="padding-top: 40px; opacity: 0.3;">
+                        <i class="fas fa-ticket-alt fa-3x mb-4"></i>
+                        <p style="font-size:12px; font-weight:600;">Tu bóveda de tickets está vacía.<br>Toca las sillas para reservar.</p>
+                    </div>
+                </div>
+
+                <div class="checkout-area">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-end;">
+                        <div style="display:flex; flex-direction:column;">
+                            <span style="font-size: 10px; color:#aaa; font-weight:800; text-transform:uppercase; letter-spacing:1px; display:flex; align-items:center; gap:6px;">
+                                Total a Pagar
+                            </span>
+                            <span style="font-size: 11px; color:var(--color-primary); font-family:monospace; font-weight:bold;"><span id="sheet-ticket-count">0</span> Tickets</span>
+                        </div>
+                        <span style="font-size: 28px; font-weight: 900; color: white; line-height:1; font-family:monospace;">
+                            $<span id="total-amount">0</span>
+                        </span>
+                    </div>
+                    
+                    <button id="btn-pay" class="btn-main" disabled onclick="CevicheTicketEngine.initializeMercadoPago(event)">
+                        <i class="fa-solid fa-lock text-[12px]"></i> Autorizar Pago
+                    </button>
+                    
+                    <div class="text-center" style="font-size: 9px; color: #555; font-family:monospace; font-weight:bold; letter-spacing:1px; margin-top:8px;">
+                        <i class="fas fa-shield-alt text-blue-500"></i> PROTEGIDO POR MERCADO PAGO SECURE GATEWAY
+                    </div>
                 </div>
             </div>
+
+            <div id="payment-brick-container"></div>
+
         </div>
     </div>
 </div>
@@ -490,10 +475,11 @@
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://sdk.mercadopago.com/js/v2"></script>
 
 <script>
 // ==============================================================================
-// 🚀 KERNEL DE COMPRA CEVICHE OS (IIFE para prevenir Memory Dumps y XSS)
+// 🚀 KERNEL DE COMPRA CEVICHE OS (GOD-TIER EDITION)
 // ==============================================================================
 const CevicheTicketEngine = (function() {
     'use strict';
@@ -502,6 +488,7 @@ const CevicheTicketEngine = (function() {
     const CONFIG = {
         functionId: "{{ function.id|force_escape }}",
         apiUrl: "/api/orders/orders/",
+        mpPublicKey: "TEST-ea212732-6503-4eba-9ca1-c2f1a5cb6e9e", // 👈 REEMPLAZA ESTO CON TU PUBLIC KEY
         csrfToken: document.querySelector('[name=csrfmiddlewaretoken]').value,
         seatSpacing: 50,
         colors: { primary: '#00E676', vip: '#FFD700', sold: '#2c2c2c' }
@@ -510,14 +497,9 @@ const CevicheTicketEngine = (function() {
     /* --- MÁQUINA DE ESTADO INMUTABLE --- */
     const State = {
         selectedSeats: [],
-        blocksIndex: {}, // Indexador para Camera Auto-Focus
-        map: {
-            scale: 0.8,
-            pointX: window.innerWidth / 2, // Centrar inicialmente
-            pointY: 200,
-            panning: false,
-            startX: 0, startY: 0
-        }
+        blocksIndex: {}, 
+        totalAmount: 0,
+        map: { scale: 0.8, pointX: window.innerWidth / 2, pointY: 200, panning: false, startX: 0, startY: 0 }
     };
     Object.seal(State);
 
@@ -535,7 +517,9 @@ const CevicheTicketEngine = (function() {
         tooltip: document.getElementById('tooltip'),
         zoneNav: document.getElementById('zone-navigator'),
         cartSheet: document.getElementById('cart-sheet'),
-        floatingPill: document.getElementById('floating-cart-pill')
+        floatingPill: document.getElementById('floating-cart-pill'),
+        cartUiWrapper: document.getElementById('cart-ui-wrapper'),
+        brickContainer: document.getElementById('payment-brick-container')
     };
 
     /* --- SANITIZADOR XSS FRONTEND --- */
@@ -559,13 +543,12 @@ const CevicheTicketEngine = (function() {
         const MIN_SCALE = 0.15;
         const MAX_SCALE = 4;
 
-        // A. EVENTOS TÁCTILES (Mobile)
         R.container.addEventListener('touchstart', (e) => {
             if (e.touches.length === 1) {
                 State.map.panning = true;
                 State.map.startX = e.touches[0].clientX - State.map.pointX;
                 State.map.startY = e.touches[0].clientY - State.map.pointY;
-                R.content.style.transition = 'none'; // Quitar lag
+                R.content.style.transition = 'none'; 
             } else if (e.touches.length === 2) {
                 State.map.panning = false;
                 initialPinchDist = getPinchDistance(e.touches);
@@ -575,7 +558,7 @@ const CevicheTicketEngine = (function() {
 
         R.container.addEventListener('touchmove', (e) => {
             if (e.touches.length === 1 && State.map.panning) {
-                e.preventDefault(); // Evitar scroll de la página web
+                e.preventDefault(); 
                 State.map.pointX = e.touches[0].clientX - State.map.startX;
                 State.map.pointY = e.touches[0].clientY - State.map.startY;
                 applyTransform();
@@ -601,7 +584,6 @@ const CevicheTicketEngine = (function() {
             }
         });
 
-        // B. EVENTOS MOUSE (Desktop)
         R.container.addEventListener('wheel', (e) => {
             e.preventDefault();
             const rect = R.container.getBoundingClientRect();
@@ -648,7 +630,6 @@ const CevicheTicketEngine = (function() {
             }
         });
 
-        // C. BOTONES MANUALES
         document.getElementById('zoom-in').onclick = () => zoomToPoint(R.container.clientWidth/2, R.container.clientHeight/2, 0.5);
         document.getElementById('zoom-out').onclick = () => zoomToPoint(R.container.clientWidth/2, R.container.clientHeight/2, -0.5);
         document.getElementById('zoom-reset').onclick = autoFitMap;
@@ -685,7 +666,6 @@ const CevicheTicketEngine = (function() {
             const loader = document.getElementById('loading-msg');
             if(loader) loader.remove();
 
-            // Usamos Fragmento para inyectar todo en el DOM de golpe y evitar Lag O(n)
             const fragment = document.createDocumentFragment();
             let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 
@@ -860,7 +840,6 @@ const CevicheTicketEngine = (function() {
             el.classList.add('selected');
             State.selectedSeats.push(data);
             
-            // Retroalimentación visual en la Píldora
             if(window.innerWidth < 992) pulsePill();
         }
         renderCart();
@@ -878,7 +857,6 @@ const CevicheTicketEngine = (function() {
             R.pillTotalEl.innerText = '$0';
             R.btnPay.disabled = true;
             
-            // Ocultar Píldora y Cerrar Cart
             R.floatingPill.classList.remove('visible');
             if(R.cartSheet.classList.contains('expanded')) toggleCartSheet();
             return;
@@ -918,6 +896,7 @@ const CevicheTicketEngine = (function() {
             R.cartList.appendChild(row);
         });
 
+        State.totalAmount = total;
         const totalStr = total.toLocaleString();
         R.totalEl.innerText = totalStr;
         R.pillTotalEl.innerText = `$${totalStr}`;
@@ -925,13 +904,11 @@ const CevicheTicketEngine = (function() {
         R.pillCountEl.innerText = State.selectedSeats.length;
         R.btnPay.disabled = false;
 
-        // Mostrar Píldora si hay elementos
         if(window.innerWidth < 992) {
             R.floatingPill.classList.add('visible');
         }
     }
 
-    /* Interacciones del Bottom Sheet (Mobile) */
     function toggleCartSheet() {
         if (window.innerWidth >= 992) return;
         R.cartSheet.classList.toggle('expanded');
@@ -972,7 +949,6 @@ const CevicheTicketEngine = (function() {
     
     function hideTooltip() { R.tooltip.style.display = 'none'; }
 
-    // Feedback en móvil al tocar bloqueado
     function showTooltipAction(el, msg) {
         const rect = el.getBoundingClientRect();
         const msgEl = document.createElement('div');
@@ -991,44 +967,126 @@ const CevicheTicketEngine = (function() {
     });
 
     /* =========================================================
-       6. INTEGRACIÓN WAF Y PAGOS (WOMPI)
+       6. 🛡️ INTEGRACIÓN BANCARIA (MERCADO PAGO BRICKS)
     ========================================================= */
-    function execPayment(e) {
+    const mp = new MercadoPago(CONFIG.mpPublicKey, { locale: 'es-CO' });
+    let bricksBuilder = null;
+
+    async function initializeMercadoPago(e) {
         e.stopPropagation(); 
-        R.btnPay.disabled = true;
-        const originalText = R.btnPay.innerHTML;
-        R.btnPay.innerHTML = '<i class="fas fa-circle-notch fa-spin text-lg"></i> ENCRIPTANDO...';
+        
+        if(State.selectedSeats.length === 0) return;
+        if(State.totalAmount <= 0) {
+            Swal.fire({ icon: 'error', title: 'Error Lógico', text: 'Monto inválido para transacción.', background: '#0a0a0c', color: '#fff' });
+            return;
+        }
 
-        fetch(CONFIG.apiUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CONFIG.csrfToken },
-            body: JSON.stringify({
-                function_id: CONFIG.functionId,
-                seat_labels: State.selectedSeats.map(s => s.label),
-                products: [] 
-            })
-        })
-        .then(res => res.json().then(data => ({ok: res.ok, data})))
-        .then(res => {
-            if(!res.ok) throw new Error(res.data.error || 'Negación del procesador de pagos');
+        // Metamorfosis Visual: Ocultamos el carrito estándar y mostramos el Brick Bancario
+        if (!R.cartSheet.classList.contains('expanded')) R.cartSheet.classList.add('expanded');
+        R.cartUiWrapper.style.display = 'none';
+        R.brickContainer.style.display = 'block';
+        R.brickContainer.innerHTML = '<div class="text-center py-10"><i class="fas fa-circle-notch fa-spin text-3xl" style="color:var(--color-primary)"></i><br><span class="text-xs font-mono mt-3 block" style="color:#aaa">INICIALIZANDO BÓVEDA BANCARIA...</span></div>';
+
+        try {
+            bricksBuilder = mp.bricks();
+            const settings = {
+                initialization: { amount: State.totalAmount },
+                customization: {
+                    visual: {
+                        style: {
+                            theme: 'dark', 
+                            customVariables: {
+                                textPrimaryColor: '#ffffff',
+                                textSecondaryColor: '#aaaaaa',
+                                inputBackgroundColor: '#0a0a0c',
+                                inputBorderColor: '#333333',
+                                baseColor: '#00E676', 
+                            }
+                        }
+                    },
+                    paymentMethods: {
+                        creditCard: "all",
+                        debitCard: "all",
+                        ticket: "all"
+                    }
+                },
+                callbacks: {
+                    onReady: () => {
+                        // El Brick cargó exitosamente
+                    },
+                    // 🛡️ TRADUCTOR CRIPTOGRÁFICO Y SANITIZADOR DE MEMORIA (O(N))
+                    onSubmit: ({ selectedPaymentMethod, formData }) => {
+                        return new Promise((resolve, reject) => {
+                            
+                            // Traduce el payload inseguro de MP al estándar Zero-Trust de Django
+                            const finalPayload = {
+                                token: formData.token || "", 
+                                payment_method_id: formData.paymentMethodId || formData.payment_method_id || "", 
+                                installments: parseInt(formData.installments) || 1,
+                                transaction_amount: parseFloat(State.totalAmount), 
+                                payer: {
+                                    email: formData.payer?.email || "usuario@seguro.com",
+                                    identification: {
+                                        type: formData.payer?.identification?.type || "",
+                                        number: formData.payer?.identification?.number || ""
+                                    }
+                                },
+                                function_id: CONFIG.functionId,
+                                
+                                // 🛡️ EVITA EL PUNTERO NULO: Extrae fila y número directamente
+                                seat_labels: State.selectedSeats.map(s => `${s.row}-${s.num}`) 
+                            };
+
+                            console.log("🛡️ [GOD-TIER] Payload sanitizado hacia Django:", JSON.stringify(finalPayload));
+
+                            fetch(CONFIG.apiUrl, {
+                                method: "POST",
+                                headers: {
+                                    "Content-Type": "application/json",
+                                    "X-CSRFToken": CONFIG.csrfToken
+                                },
+                                body: JSON.stringify(finalPayload)
+                            })
+                            .then((res) => res.json().then(data => ({ok: res.ok, data})))
+                            .then((response) => {
+                                if (!response.ok) {
+                                    console.error("❌ Rechazo del Kernel:", response.data);
+                                    throw new Error(response.data.error || "Declinado por el protocolo de seguridad.");
+                                }
+                                
+                                resolve(); 
+                                
+                                Swal.fire({ 
+                                    icon: 'success', 
+                                    title: 'TRANSACCIÓN APROBADA', 
+                                    text: 'Bóveda actualizada. Generando Smart Tickets...',
+                                    background: '#0a0a0c', color: '#fff', confirmButtonColor: '#00E676'
+                                }).then(() => window.location.href = '/mis-tickets'); 
+                            })
+                            .catch((error) => {
+                                reject(); 
+                                Swal.fire({ 
+                                    icon: 'error', 
+                                    title: 'Acceso Denegado', 
+                                    text: error.message, 
+                                    background: '#0a0a0c', color: '#fff' 
+                                });
+                            });
+                        });
+                    },
+                    onError: (error) => {
+                        console.error(error);
+                        Swal.fire({ icon: 'error', title: 'Falla del Sensor', text: 'Error inicializando módulo de pagos.', background: '#0a0a0c', color: '#fff' });
+                    }
+                }
+            };
             
-            // Redirigir a Wompi Checkout de forma segura
-            const wompiUrl = new URL("https://checkout.wompi.co/p/");
-            wompiUrl.searchParams.append("public-key", res.data.wompi_public_key);
-            wompiUrl.searchParams.append("currency", res.data.wompi_currency);
-            wompiUrl.searchParams.append("amount-in-cents", res.data.amount_in_cents);
-            wompiUrl.searchParams.append("reference", res.data.reference);
-            wompiUrl.searchParams.append("signature:integrity", res.data.wompi_signature);
-            wompiUrl.searchParams.append("redirect-url", `${window.location.origin}/orders/${res.data.id}/status`);
-
-            window.location.href = wompiUrl.toString();
-        })
-        .catch(err => {
-            console.error(err);
-            Swal.fire({ icon: 'error', title: 'Transacción Bloqueada', text: err.message, background: '#0a0a0c', color: '#fff', confirmButtonColor: '#ef4444' });
-            R.btnPay.disabled = false;
-            R.btnPay.innerHTML = originalText;
-        });
+            R.brickContainer.innerHTML = '';
+            window.paymentBrickController = await bricksBuilder.create("payment", "payment-brick-container", settings);
+            
+        } catch(e) {
+            R.brickContainer.innerHTML = '<div class="text-center text-red-500 py-5">Falla en la inyección de la pasarela. Recargue la página.</div>';
+        }
     }
 
     /* --- EXPOSICIÓN DE API PÚBLICA --- */
@@ -1038,7 +1096,7 @@ const CevicheTicketEngine = (function() {
             loadMapData();
         },
         toggleCart: toggleCartSheet,
-        execPayment: execPayment
+        initializeMercadoPago: initializeMercadoPago
     };
 
 })();

@@ -1,119 +1,145 @@
+import re
+from decimal import Decimal
 from rest_framework import serializers
+from django.core.validators import MinValueValidator, MaxValueValidator
+from django.utils.translation import gettext_lazy as _
 from apps.orders.models import Order, Ticket, OrderItem
 from apps.products.models import Product
 
-# ==========================================
-# 📥 SERIALIZADORES DE ENTRADA (INPUT)
-# ==========================================
+# ==============================================================================
+# 📥 1. SERIALIZADORES DE ENTRADA (ESCUDO ZERO-TRUST / GRADO MILITAR)
+# ==============================================================================
 
 class ProductInputSerializer(serializers.Serializer):
     """
-    Recibe productos de la tienda (combos, comida, merch).
+    Recibe productos adicionales.
+    🛡️ Anti-Hoarding: Límite estricto de compra por transacción para evitar que
+    un bot vacíe el inventario.
     """
-    product_id = serializers.UUIDField()
-    quantity = serializers.IntegerField(min_value=1)
+    product_id = serializers.UUIDField(required=True)
+    quantity = serializers.IntegerField(
+        required=True,
+        validators=[
+            MinValueValidator(1, message="La cantidad no puede ser menor a 1."),
+            MaxValueValidator(50, message="Violación de Límite: Máximo 50 unidades por ítem.")
+        ]
+    )
 
-class CreateOrderSerializer(serializers.Serializer):
+class PayerIdentificationSerializer(serializers.Serializer):
+    """Estructura de identificación exigida por Mercado Pago"""
+    type = serializers.CharField(required=False, allow_blank=True, max_length=20)
+    number = serializers.CharField(required=False, allow_blank=True, max_length=50)
+
+class PayerSerializer(serializers.Serializer):
+    """Datos encriptados del pagador"""
+    email = serializers.EmailField(required=True)
+    identification = PayerIdentificationSerializer(required=False)
+
+class PaymentBrickInputSerializer(serializers.Serializer):
     """
-    Contrato maestro de compra.
-    Maneja la lógica mixta: Boletas (Texto) + Productos.
+    🛡️ CONTRATO MAESTRO DE COMPRA (MERCADO PAGO BRICKS):
+    Inspección Profunda de Paquetes (DPI) en capa de aplicación.
     """
-    function_id = serializers.UUIDField(required=True)
-    
-    # ✅ CORRECCIÓN: Agregamos este campo que FALTABA.
-    # Acepta la lista de nombres de sillas que envía el mapa (Ej: ["A-1", "B-2"])
-    seat_labels = serializers.ListField(
-        child=serializers.CharField(),
-        required=False,
-        default=list
+    # --- Credenciales y Datos del Banco ---
+    token = serializers.CharField(required=False, allow_null=True, allow_blank=True, max_length=255)
+    payment_method_id = serializers.CharField(required=True, max_length=100)
+    installments = serializers.IntegerField(
+        required=False, 
+        default=1,
+        validators=[
+            MinValueValidator(1),
+            MaxValueValidator(36) # Previene inyección de plazos absurdos
+        ]
     )
     
-    # Mantenemos products por si acaso vendes comida después
-    products = ProductInputSerializer(many=True, required=False, default=list)
+    # 🛡️ Protección de Overflow Financiero: Tope transaccional ($99,999,999.99)
+    transaction_amount = serializers.DecimalField(
+        required=True,
+        max_digits=10, 
+        decimal_places=2,
+        min_value=Decimal('100.00'), # Cobro mínimo para evitar ataques de micro-testing de tarjetas
+        max_value=Decimal('99999999.99') 
+    )
+    payer = PayerSerializer(required=True)
+    
+    # --- Datos del Dominio (El Evento) ---
+    function_id = serializers.UUIDField(required=True)
+    seat_labels = serializers.ListField(
+        child=serializers.CharField(max_length=50),
+        allow_empty=False, 
+        required=True,
+        max_length=10 # 🛡️ Límite absoluto impuesto a nivel de estructura de datos
+    )
+    products = ProductInputSerializer(many=True, required=False, default=list, max_length=20)
+
+    def validate_seat_labels(self, value):
+        """
+        🛡️ SANITIZACIÓN ESTRICTA DE ETIQUETAS:
+        Evita inyección SQL secundaria o XSS si estos labels se usan luego.
+        Solo permite letras, números y guiones medios (Ej: "A-12", "VIP-1").
+        """
+        pattern = re.compile(r'^[A-Za-z0-9\-]+$')
+        for label in value:
+            if not pattern.match(label):
+                raise serializers.ValidationError(
+                    f"Violación de Integridad: La silla '{label}' contiene caracteres no permitidos."
+                )
+        return value
 
     def validate(self, data):
-        """
-        🛡️ VALIDACIÓN DE NEGOCIO:
-        Evita que se creen órdenes vacías.
-        """
+        """🛡️ REGLAS DE NEGOCIO ESTRICTAS (Validación Cruzada)"""
         seat_labels = data.get('seat_labels', [])
-        products = data.get('products', [])
-
-        # Si no hay ni sillas (seat_labels) ni productos, rechazamos la compra.
-        # Antes fallaba porque buscaba 'tickets' que no existía.
-        if not seat_labels and not products:
-            raise serializers.ValidationError(
-                "El carrito de compras no puede estar vacío. Selecciona sillas o productos."
-            )
         
+        # Validación de duplicados (Anti-Tampering)
+        if len(seat_labels) != len(set(seat_labels)):
+            raise serializers.ValidationError("Violación Lógica: El carrito contiene sillas duplicadas.")
+            
         return data
 
-# ==========================================
-# 📤 SERIALIZADORES DE SALIDA (OUTPUT)
-# ==========================================
+
+# ==============================================================================
+# 📤 2. SERIALIZADORES DE SALIDA (PRESENTACIÓN SEGURA & ANTI-REVERSE ENGINEERING)
+# ==============================================================================
 
 class TicketDetailSerializer(serializers.ModelSerializer):
-    """Detalle de boleta para el resumen"""
-    # Leemos la etiqueta directamente del Ticket (campo seat_label)
-    seat_label = serializers.CharField(read_only=True)
-    
-    # Calculamos la categoría visualmente (VIP/General) basada en el precio
-    # Esto evita errores si la relación 'seat' no existe.
-    category_name = serializers.SerializerMethodField()
-    
+    """Detalle inmutable de la boleta para el cliente."""
     class Meta:
         model = Ticket
-        fields = ['id', 'seat_label', 'category_name', 'price_at_purchase', 'qr_token']
-
-    def get_category_name(self, obj):
-        # Lógica simple: Si pagó más de 40.000, asumimos VIP para mostrar en el recibo
-        if obj.price_at_purchase and obj.price_at_purchase > 40000:
-            return "VIP"
-        return "General"
+        fields = [
+            'id', 
+            'seat_label', 
+            'seat_category', 
+            'price_at_purchase', 
+            'qr_token',
+            'state'
+        ]
 
 class OrderItemDetailSerializer(serializers.ModelSerializer):
-    """Detalle de comida para el resumen"""
+    """Detalle de productos adicionales."""
     product_name = serializers.CharField(source='product.name', read_only=True)
-    total_line = serializers.SerializerMethodField()
+    total_line = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
 
     class Meta:
         model = OrderItem
-        fields = ['product_name', 'quantity', 'price_at_purchase', 'total_line']
-
-    def get_total_line(self, obj):
-        # Calcula el total de la línea al vuelo
-        return obj.price_at_purchase * obj.quantity
+        fields = ['product_name', 'quantity', 'price_at_purchase', 'discount_applied', 'total_line']
 
 class OrderSummarySerializer(serializers.ModelSerializer):
-    """
-    Resumen COMPLETO para el usuario.
-    Incluye los datos de seguridad requeridos por Wompi.
-    """
-    # Nested Serializers: Inyectamos el detalle visual
+    """Resumen de compra estandarizado. Protege variables internas."""
     tickets = TicketDetailSerializer(many=True, read_only=True)
     items = OrderItemDetailSerializer(many=True, read_only=True) 
-
-    # 🔐 CAMPOS CRÍTICOS PARA WOMPI (Inyectados por la Vista)
-    wompi_signature = serializers.CharField(read_only=True)
-    wompi_public_key = serializers.CharField(read_only=True)
-    amount_in_cents = serializers.IntegerField(read_only=True)
-    wompi_currency = serializers.CharField(default="COP", read_only=True)
-    
-    # Campo extra para referencia
-    reference = serializers.CharField(source='wompi_reference', read_only=True)
+    reference = serializers.CharField(source='wompi_reference', read_only=True) 
 
     class Meta:
         model = Order
         fields = [
             'id', 
             'reference',
-            'wompi_reference', 
-            'total_amount', 
-            'amount_in_cents', # Necesario para el widget
-            'wompi_signature', # Necesario para el widget
-            'wompi_public_key',# Necesario para el widget
-            'wompi_currency',
             'status', 
+            'currency',
+            'total_amount', 
+            'tax_amount',
+            'fee_amount',
+            'amount_paid',
             'created_at',
             'tickets', 
             'items'
