@@ -9,6 +9,8 @@
     }
 </script>
 
+{{ venues_json|json_script:"venues-data-matrix" }}
+
 <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-6 md:mb-8 animate-fade-in-down" role="region" aria-label="Indicadores clave de rendimiento">
     <div class="glass-panel p-4 md:p-5 rounded-xl border border-slate-700/50 flex items-center justify-between relative overflow-hidden group">
         <div class="absolute inset-0 bg-gradient-to-r from-brand-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
@@ -50,7 +52,7 @@
         <p class="text-[10px] md:text-xs text-slate-400 font-mono mt-1">Gestor criptográfico de inventarios y activos.</p>
     </div>
     
-    <button type="button" onclick="CevicheKernel.openCreateModal()" class="w-full sm:w-auto bg-gradient-to-r from-brand-600 to-brand-500 hover:from-brand-500 hover:to-brand-400 text-white px-6 py-3.5 rounded-lg shadow-[0_0_20px_rgba(255,102,0,0.4)] transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-3 font-bold border border-brand-400/50 cursor-pointer">
+    <button type="button" onclick="CevicheKernel.openCreateModal()" class="w-full sm:w-auto bg-gradient-to-r from-brand-600 to-brand-500 hover:from-brand-500 hover:to-brand-400 text-white px-6 py-3.5 rounded-lg shadow-[0_0_20px_rgba(255,102,0,0.4)] transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-3 font-bold border border-brand-400/50 cursor-pointer focus:ring-2 focus:ring-brand-500 outline-none">
         <i class="fa-solid fa-layer-group"></i> Inicializar Nodo
     </button>
 </div>
@@ -235,11 +237,7 @@
                 </h4>
                 
                 <div class="space-y-3 md:space-y-5" id="stats-container">
-                    <div class="text-center py-10 md:py-16">
-                        <i class="fa-solid fa-atom fa-spin text-brand-500 text-3xl md:text-4xl mb-4"></i>
-                        <p class="text-[9px] md:text-[10px] text-slate-500 font-mono tracking-widest">SINCRONIZANDO CON DB...</p>
                     </div>
-                </div>
             </div>
 
             <div class="mt-6 md:mt-10 pt-5 md:pt-6 border-t border-slate-800 grid grid-cols-2 gap-4 md:gap-6 bg-[#050505] p-4 md:p-5 rounded-xl">
@@ -261,7 +259,6 @@
     <div class="bg-[#0b0b0e] border border-slate-700/80 rounded-t-3xl md:rounded-2xl w-full max-w-xl h-[92vh] md:h-auto md:max-h-[90vh] flex flex-col relative shadow-[0_-20px_60px_rgba(0,0,0,0.9)] md:shadow-[0_0_60px_rgba(0,0,0,0.9)] transform translate-y-full md:translate-y-0 md:scale-95 data-[state=open]:translate-y-0 data-[state=open]:scale-100 transition-transform duration-300">
         
         <div class="p-4 md:p-6 pb-4 border-b border-slate-800 flex justify-between items-center shrink-0 bg-[#050505] rounded-t-3xl md:rounded-t-2xl shadow-md z-20 relative">
-            
             <div class="w-full flex justify-center py-2 md:hidden absolute top-0 left-0">
                 <div class="w-12 h-1.5 bg-slate-700 rounded-full"></div>
             </div>
@@ -288,7 +285,7 @@
                     <i class="fa-solid fa-triangle-exclamation text-2xl text-amber-500 shrink-0 mt-1"></i>
                     <div>
                         <h4 class="text-white font-bold text-sm md:text-base">Malla de Teatros Vacía</h4>
-                        <p class="text-slate-400 text-[10px] md:text-xs mt-1 leading-relaxed">No hay recintos físicos registrados en la base de datos. Debes inicializar un Teatro antes de poder inyectar eventos.</p>
+                        <p class="text-slate-400 text-[10px] md:text-xs mt-1 leading-relaxed">No hay recintos físicos registrados en la DB. Inicializa un Teatro antes de inyectar eventos.</p>
                         <button onclick="window.location.href='{% url 'dashboard:theater_editor' %}'" type="button" class="mt-4 px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-black font-black text-[10px] uppercase tracking-widest rounded-lg shadow-lg shadow-amber-500/20 transition-all w-full sm:w-auto">Ir al Editor de Topología</button>
                     </div>
                 </div>
@@ -296,7 +293,6 @@
 
             <div id="stats-card" class="mb-6 md:mb-8 bg-[#050505] border border-slate-800 rounded-xl p-4 md:p-5 relative overflow-hidden shadow-inner">
                 <div class="absolute top-0 left-0 w-1 h-full bg-brand-500 shadow-[0_0_10px_#ff6600]"></div>
-                
                 <div class="flex justify-between items-end mb-3 relative z-10">
                     <div>
                         <span class="text-[8px] md:text-[9px] uppercase font-black tracking-widest text-slate-500 block mb-1">Carga Topológica Actual</span>
@@ -309,11 +305,9 @@
                         <span id="stat-occupancy" class="text-[9px] md:text-[10px] font-black text-brand-400 bg-brand-500/10 px-2.5 py-1 md:px-2.5 rounded border border-brand-500/30 shadow-inner inline-block mb-1">0% Ocup</span>
                     </div>
                 </div>
-
                 <div class="w-full h-2 md:h-2 bg-slate-900 rounded-full overflow-hidden mt-3 border border-slate-800">
                     <div id="stat-progress" class="h-full bg-gradient-to-r from-brand-600 to-amber-400 transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(255,102,0,0.5)]" style="width: 0%"></div>
                 </div>
-                
                 <div class="flex justify-between mt-3 text-[8px] md:text-[9px] font-mono text-slate-500 bg-black/40 p-2.5 rounded border border-white/5">
                     <span>EXTRACCIÓN: <strong id="stat-sold" class="text-slate-300">0</strong></span>
                     <span>LÍMITE: <strong id="stat-total" class="text-slate-300">0</strong></span>
@@ -327,7 +321,7 @@
                     <label class="block text-[9px] md:text-[9px] uppercase font-black tracking-widest text-brand-400 pl-1"><i class="fa-solid fa-map-location-dot mr-1"></i> Recinto Físico (Teatro)</label>
                     <div class="relative">
                         <i class="fa-solid fa-building absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-sm md:text-base pointer-events-none"></i>
-                        <select id="edit-venue" name="venue_id" required class="w-full bg-[#050505] border border-slate-700/80 rounded-lg pl-11 pr-10 py-3.5 md:py-3.5 text-white text-xs md:text-sm focus:border-brand-500 outline-none transition-all focus:ring-2 focus:ring-brand-500/20 font-bold appearance-none cursor-pointer shadow-inner">
+                        <select id="edit-venue" name="venue_id" required class="w-full bg-[#050505] border border-slate-700/80 rounded-lg pl-11 pr-10 py-3.5 text-white text-xs md:text-sm focus:border-brand-500 outline-none transition-all focus:ring-2 focus:ring-brand-500/20 font-bold appearance-none cursor-pointer shadow-inner">
                             <option value="" disabled selected>Escaneando clúster...</option>
                         </select>
                         <i class="fa-solid fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 text-xs pointer-events-none"></i>
@@ -337,19 +331,19 @@
                 <div class="space-y-1.5">
                     <label class="block text-[8px] md:text-[9px] uppercase font-black tracking-widest text-slate-500 pl-1">Identificador Público</label>
                     <input type="text" id="edit-name" name="name" required autocomplete="off" spellcheck="false"
-                           class="w-full bg-[#050505] border border-slate-700/80 rounded-lg px-4 py-3.5 md:py-3 text-white text-xs md:text-sm focus:border-brand-500 outline-none transition-all focus:ring-2 focus:ring-brand-500/20 font-bold placeholder:text-slate-700 shadow-inner">
+                           class="w-full bg-[#050505] border border-slate-700/80 rounded-lg px-4 py-3.5 text-white text-xs md:text-sm focus:border-brand-500 outline-none transition-all focus:ring-2 focus:ring-brand-500/20 font-bold placeholder:text-slate-700 shadow-inner">
                 </div>
 
                 <div class="grid grid-cols-2 gap-4 md:gap-5">
                     <div class="space-y-1.5">
                         <label class="block text-[8px] md:text-[9px] uppercase font-black tracking-widest text-slate-500 pl-1">Fecha</label>
                         <input type="date" id="edit-date" name="date" required 
-                               class="w-full bg-[#050505] border border-slate-700/80 rounded-lg px-3 md:px-4 py-3.5 md:py-3 text-white text-xs md:text-sm focus:border-brand-500 outline-none transition-all focus:ring-2 focus:ring-brand-500/20 font-mono shadow-inner appearance-none">
+                               class="w-full bg-[#050505] border border-slate-700/80 rounded-lg px-3 py-3.5 text-white text-xs md:text-sm focus:border-brand-500 outline-none transition-all focus:ring-2 focus:ring-brand-500/20 font-mono shadow-inner appearance-none">
                     </div>
                     <div class="space-y-1.5">
                         <label class="block text-[8px] md:text-[9px] uppercase font-black tracking-widest text-slate-500 pl-1">Hora</label>
                         <input type="time" id="edit-time" name="time" required 
-                               class="w-full bg-[#050505] border border-slate-700/80 rounded-lg px-3 md:px-4 py-3.5 md:py-3 text-white text-xs md:text-sm focus:border-brand-500 outline-none transition-all focus:ring-2 focus:ring-brand-500/20 font-mono shadow-inner appearance-none">
+                               class="w-full bg-[#050505] border border-slate-700/80 rounded-lg px-3 py-3.5 text-white text-xs md:text-sm focus:border-brand-500 outline-none transition-all focus:ring-2 focus:ring-brand-500/20 font-mono shadow-inner appearance-none">
                     </div>
                 </div>
 
@@ -368,11 +362,11 @@
                     
                     <div class="bg-[#050505] border border-slate-800 p-3 md:p-4 rounded-xl shadow-inner">
                         <div class="flex gap-2 mb-4 bg-[#0b0b0e] p-1.5 rounded-lg border border-slate-700/50 w-full relative">
-                            <label class="flex-1 flex items-center justify-center gap-2 text-[9px] md:text-[10px] font-black tracking-widest text-slate-400 cursor-pointer px-2 md:px-4 py-2.5 rounded transition-all hover:bg-white/5 has-[:checked]:bg-brand-600 has-[:checked]:text-white shadow-sm touch-manipulation">
+                            <label class="flex-1 flex items-center justify-center gap-2 text-[9px] font-black tracking-widest text-slate-400 cursor-pointer px-2 py-2.5 rounded transition-all hover:bg-white/5 has-[:checked]:bg-brand-600 has-[:checked]:text-white shadow-sm touch-manipulation">
                                 <input type="radio" name="poster_method" value="upload" checked onchange="CevicheKernel.togglePosterMethod()" class="sr-only"> 
                                 <i class="fa-solid fa-hard-drive"></i> Local
                             </label>
-                            <label class="flex-1 flex items-center justify-center gap-2 text-[9px] md:text-[10px] font-black tracking-widest text-slate-400 cursor-pointer px-2 md:px-4 py-2.5 rounded transition-all hover:bg-white/5 has-[:checked]:bg-brand-600 has-[:checked]:text-white shadow-sm touch-manipulation">
+                            <label class="flex-1 flex items-center justify-center gap-2 text-[9px] font-black tracking-widest text-slate-400 cursor-pointer px-2 py-2.5 rounded transition-all hover:bg-white/5 has-[:checked]:bg-brand-600 has-[:checked]:text-white shadow-sm touch-manipulation">
                                 <input type="radio" name="poster_method" value="url" onchange="CevicheKernel.togglePosterMethod()" class="sr-only"> 
                                 <i class="fa-solid fa-cloud-arrow-down"></i> URL Link
                             </label>
@@ -380,7 +374,7 @@
 
                         <div id="wrapper-poster-file" class="animate-fade-in-up">
                             <input type="file" id="edit-poster-file" name="poster" accept="image/jpeg, image/png, image/webp" 
-                                class="w-full text-[9px] md:text-[10px] font-mono text-slate-400 file:mr-3 file:md:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-[9px] file:font-black file:tracking-widest file:bg-slate-800 file:text-white hover:file:bg-slate-700 cursor-pointer transition-all border border-dashed border-slate-700 p-2 rounded-xl bg-[#0b0b0e]">
+                                class="w-full text-[9px] font-mono text-slate-400 file:mr-3 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-[9px] file:font-black file:tracking-widest file:bg-slate-800 file:text-white hover:file:bg-slate-700 cursor-pointer transition-all border border-dashed border-slate-700 p-2 rounded-xl bg-[#0b0b0e]">
                         </div>
                             
                         <div id="wrapper-poster-url" class="hidden animate-fade-in-up">
@@ -403,8 +397,8 @@
                         <table class="w-full text-left border-collapse min-w-[300px]">
                             <thead class="bg-slate-900/50 border-b border-slate-800">
                                 <tr>
-                                    <th class="py-3 px-4 text-[8px] md:text-[9px] uppercase font-black tracking-widest text-slate-500">ID de Zona</th>
-                                    <th class="py-3 px-4 text-[8px] md:text-[9px] uppercase font-bold tracking-widest text-slate-500 text-right">Valor (COP)</th>
+                                    <th class="py-3 px-4 text-[8px] uppercase font-black tracking-widest text-slate-500">ID de Zona</th>
+                                    <th class="py-3 px-4 text-[8px] uppercase font-bold tracking-widest text-slate-500 text-right">Valor (COP)</th>
                                 </tr>
                             </thead>
                             <tbody id="pricing-table-body" class="divide-y divide-slate-800/50">
@@ -444,26 +438,71 @@
 const CevicheKernel = (function() {
     'use strict';
 
-    const STATE = {
+    // 🛡️ MEMORY ISOLATION & IMMUTABILITY
+    const STATE = Object.seal({
         isRequestPending: false,
         abortController: null,
         venues: [] 
-    };
-    Object.seal(STATE);
+    });
 
-    const sanitizeHTML = (dirtyString) => {
-        if (typeof dirtyString !== 'string') return '';
-        const doc = new DOMParser().parseFromString(dirtyString, 'text/html');
-        return doc.body.textContent || "";
+    // 🛡️ DOM CLOBBERING & XSS MITIGATION (Strict Node Creation)
+    const CryptographicSanitizer = {
+        text: (str) => {
+            if (!str) return '';
+            const div = document.createElement('div');
+            div.textContent = str; // Browser nativo protege contra ejecución
+            return div.innerHTML;
+        },
+        html: (str) => {
+            // Mitigación de inyecciones iframes/scripts ocultos
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(str, 'text/html');
+            const scripts = doc.querySelectorAll('script, iframe, object, embed');
+            scripts.forEach(s => s.remove());
+            return doc.body.textContent || "";
+        }
+    };
+
+    // 🛡️ CLIENT-SIDE MALWARE SCANNER (Magic Bytes Validation)
+    const BinaryScanner = {
+        validateImage: async (file) => {
+            if (!file) return true;
+            if (file.size > 5 * 1024 * 1024) throw new Error("Payload excede cuota militar (5MB).");
+            
+            const arr = (new Uint8Array(await file.slice(0, 4).arrayBuffer())).subarray(0, 4);
+            let header = "";
+            for(let i = 0; i < arr.length; i++) header += arr[i].toString(16);
+            
+            // Validamos JPG (ffd8ffe0, ffd8ffe1, etc), PNG (89504e47), WEBP (52494646)
+            if (!header.startsWith("ffd8") && !header.startsWith("89504e47") && !header.startsWith("52494646")) {
+                throw new Error("Firma binaria corrupta o maliciosa. Archivo rechazado.");
+            }
+            return true;
+        }
+    };
+
+    const getCSRFToken = () => {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, 10) === ('csrftoken=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(10));
+                    break;
+                }
+            }
+        }
+        return cookieValue || '{{ csrf_token }}'; // Fallback a template tag si falla la cookie
     };
 
     const spawnToast = (msg, type = 'success') => {
         const t = document.createElement('div');
         const isErr = type === 'error';
-        t.className = `w-full md:w-auto px-5 py-4 rounded-xl md:rounded-lg backdrop-blur-2xl shadow-[0_10px_40px_rgba(0,0,0,0.8)] border border-white/10 text-[10px] md:text-xs font-mono font-bold flex items-center gap-3 animate-fade-in-up md:max-w-sm ${isErr ? 'bg-red-950/95 text-red-100 border-b-4 md:border-b-0 md:border-l-4 border-red-500' : 'bg-emerald-950/95 text-emerald-100 border-b-4 md:border-b-0 md:border-l-4 border-emerald-500'}`;
+        t.className = `w-full md:w-auto px-5 py-4 rounded-xl md:rounded-lg backdrop-blur-2xl shadow-[0_10px_40px_rgba(0,0,0,0.8)] border border-white/10 text-[10px] md:text-xs font-mono font-bold flex items-center gap-3 animate-fade-in-up md:max-w-sm ${isErr ? 'bg-red-950/95 text-red-100 border-b-4 md:border-l-4 border-red-500' : 'bg-emerald-950/95 text-emerald-100 border-b-4 md:border-l-4 border-emerald-500'}`;
         t.innerHTML = isErr 
-            ? `<i class="fa-solid fa-skull-crossbones text-red-500 text-lg md:text-xl"></i> <span class="leading-relaxed flex-1">${sanitizeHTML(msg)}</span>` 
-            : `<i class="fa-solid fa-shield-check text-emerald-500 text-lg md:text-xl"></i> <span class="leading-relaxed flex-1">${sanitizeHTML(msg)}</span>`;
+            ? `<i class="fa-solid fa-skull-crossbones text-red-500 text-lg"></i> <span class="leading-relaxed flex-1">${CryptographicSanitizer.text(msg)}</span>` 
+            : `<i class="fa-solid fa-shield-check text-emerald-500 text-lg"></i> <span class="leading-relaxed flex-1">${CryptographicSanitizer.text(msg)}</span>`;
         document.getElementById('toast-container').appendChild(t);
         setTimeout(() => { 
             t.classList.replace('animate-fade-in-up', 'opacity-0');
@@ -502,19 +541,20 @@ const CevicheKernel = (function() {
         const fragment = document.createDocumentFragment();
         for (const [cat, val] of Object.entries(stats)) {
              const pct = val.total > 0 ? Math.round((val.sold / val.total) * 100) : 0;
+             const safeCat = CryptographicSanitizer.text(cat);
              const div = document.createElement('div');
-             div.className = "mb-3 md:mb-4 bg-[#050505] p-4 md:p-4 rounded-xl border border-slate-800 shadow-inner";
+             div.className = "mb-3 md:mb-4 bg-[#050505] p-4 rounded-xl border border-slate-800 shadow-inner";
              div.innerHTML = `
                 <div class="flex justify-between items-end mb-2.5">
-                    <span class="text-[10px] md:text-[10px] font-black text-slate-300 uppercase tracking-widest">${sanitizeHTML(cat)}</span>
+                    <span class="text-[10px] font-black text-slate-300 uppercase tracking-widest">${safeCat}</span>
                     <div class="text-right">
-                        <span class="font-mono text-emerald-400 font-bold text-sm md:text-sm leading-none">${val.sold}</span>
+                        <span class="font-mono text-emerald-400 font-bold text-sm leading-none">${parseInt(val.sold)||0}</span>
                         <span class="text-[8px] text-slate-500 font-mono mx-1">/</span>
-                        <span class="font-mono text-slate-400 text-xs md:text-xs leading-none">${val.total}</span>
-                        <span class="text-[8px] text-brand-500 font-black ml-1.5 md:ml-2 bg-brand-500/10 px-1.5 py-0.5 rounded">${pct}%</span>
+                        <span class="font-mono text-slate-400 text-xs leading-none">${parseInt(val.total)||0}</span>
+                        <span class="text-[8px] text-brand-500 font-black ml-1.5 bg-brand-500/10 px-1.5 py-0.5 rounded">${pct}%</span>
                     </div>
                 </div>
-                <div class="w-full h-1.5 md:h-1.5 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
+                <div class="w-full h-1.5 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
                     <div class="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 transition-all duration-1000" style="width: ${pct}%"></div>
                 </div>
              `;
@@ -522,6 +562,43 @@ const CevicheKernel = (function() {
         }
         container.innerHTML = '';
         container.appendChild(fragment);
+    };
+
+    // 🚀 O(1) DYNAMIC RENDERING (Sin peticiones de red adicionales)
+    const renderPricingTableFromZones = (zones, existingPrices = {}) => {
+        const priceBody = document.getElementById('pricing-table-body');
+        priceBody.innerHTML = ''; 
+        
+        if (zones && Array.isArray(zones) && zones.length > 0) {
+            const fragment = document.createDocumentFragment();
+            zones.forEach(zone => {
+                const safeName = CryptographicSanitizer.text(zone.toUpperCase());
+                const safeCode = CryptographicSanitizer.text(zone);
+                const currentVal = parseFloat(existingPrices[safeCode]) || '';
+                
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-white/5 transition-colors group animate-fade-in-up";
+                tr.innerHTML = `
+                    <td class="px-3 md:px-4 py-2.5 md:py-3 align-middle">
+                        <span class="bg-slate-800 text-white border border-slate-700 px-2 py-1 rounded-md text-[8px] md:text-[9px] font-black tracking-widest shadow-sm">${safeName}</span>
+                    </td>
+                    <td class="px-3 md:px-4 py-2.5 md:py-3">
+                        <div class="relative w-[140px] md:w-[160px] ml-auto">
+                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500 font-bold text-xs">$</span>
+                            <input type="number" 
+                                   name="prices[${safeCode}]" 
+                                   value="${currentVal}" 
+                                   class="w-full bg-[#0b0b0e] border border-slate-700 rounded-lg pl-7 pr-3 py-2.5 text-right text-white text-xs font-mono focus:border-emerald-500 outline-none transition-all placeholder:text-slate-700 focus:ring-1 focus:ring-emerald-500 group-hover:border-slate-500 shadow-inner" 
+                                   placeholder="0.00" min="0" step="1000">
+                        </div>
+                    </td>
+                `;
+                fragment.appendChild(tr);
+            });
+            priceBody.appendChild(fragment);
+        } else {
+            priceBody.innerHTML = '<tr><td colspan="2" class="p-5 text-center text-[9px] uppercase font-black text-amber-500 tracking-widest bg-amber-500/10 border-t border-b border-amber-500/20"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Sin zonas registradas en la topología</td></tr>';
+        }
     };
 
     const fetchDetails = async (eventId) => {
@@ -532,32 +609,32 @@ const CevicheKernel = (function() {
         requestAnimationFrame(() => modal.setAttribute('data-state', 'open'));
         document.body.style.overflow = 'hidden'; 
         
-        container.innerHTML = '<div class="text-center py-12 md:py-16"><i class="fa-solid fa-satellite-dish fa-spin text-brand-500 text-3xl md:text-4xl mb-4"></i><p class="text-[9px] md:text-[10px] text-slate-500 font-mono tracking-widest">DESCIFRANDO PAQUETES...</p></div>';
+        container.innerHTML = '<div class="text-center py-12"><i class="fa-solid fa-satellite-dish fa-spin text-brand-500 text-3xl mb-4"></i><p class="text-[9px] text-slate-500 font-mono tracking-widest">DESCIFRANDO PAQUETES...</p></div>';
         
         if(STATE.abortController) STATE.abortController.abort();
         STATE.abortController = new AbortController();
 
         try {
-            const res = await fetch(`/api/v1/functions/${eventId}/`, { signal: STATE.abortController.signal }); 
-            if(!res.ok) throw new Error("Anomalía de red 404/500");
+            const res = await fetch(`/api/v1/functions/${encodeURIComponent(eventId)}/`, { signal: STATE.abortController.signal }); 
+            if(!res.ok) throw new Error("Anomalía de red.");
             const data = await res.json();
             
-            document.getElementById('modal-title').textContent = data.name;
+            document.getElementById('modal-title').textContent = data.name || 'Desconocido';
             document.getElementById('modal-venue-name').textContent = data.venue_name || 'Ubicación Core';
             document.getElementById('modal-desc').textContent = data.description || "Metadatos vacíos.";
             document.getElementById('modal-id').textContent = data.id;
             
             const dateObj = new Date(data.date_time);
-            document.getElementById('modal-date').textContent = dateObj.toLocaleDateString();
-            document.getElementById('modal-time').textContent = dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            document.getElementById('modal-date').textContent = !isNaN(dateObj) ? dateObj.toLocaleDateString() : '--/--/--';
+            document.getElementById('modal-time').textContent = !isNaN(dateObj) ? dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--:--';
             
             const statusBadge = document.getElementById('modal-status');
             if(data.active) {
                 statusBadge.textContent = "LIVE";
-                statusBadge.className = "px-2 md:px-2.5 py-1 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[8px] md:text-[9px] font-black uppercase tracking-widest mb-2 md:mb-4 inline-block shadow-lg";
+                statusBadge.className = "px-2.5 py-1 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[8px] md:text-[9px] font-black uppercase tracking-widest mb-4 inline-block shadow-lg";
             } else {
                 statusBadge.textContent = "OFFLINE";
-                statusBadge.className = "px-2 md:px-2.5 py-1 rounded bg-slate-800 text-slate-400 border border-slate-600 text-[8px] md:text-[9px] font-black uppercase tracking-widest mb-2 md:mb-4 inline-block shadow-lg";
+                statusBadge.className = "px-2.5 py-1 rounded bg-slate-800 text-slate-400 border border-slate-600 text-[8px] md:text-[9px] font-black uppercase tracking-widest mb-4 inline-block shadow-lg";
             }
 
             document.getElementById('modal-img').src = data.poster_url || '';
@@ -565,7 +642,7 @@ const CevicheKernel = (function() {
 
         } catch(e) {
             if(e.name === 'AbortError') return; 
-            container.innerHTML = '<div class="bg-red-950/50 border border-red-500/30 p-5 rounded-xl text-center mx-4 md:mx-0"><i class="fa-solid fa-triangle-exclamation text-red-500 text-2xl mb-3 block"></i><span class="text-[10px] md:text-xs font-mono text-red-200">El túnel de telemetría colapsó.</span></div>';
+            container.innerHTML = '<div class="bg-red-950/50 border border-red-500/30 p-5 rounded-xl text-center mx-4"><i class="fa-solid fa-triangle-exclamation text-red-500 text-2xl mb-3 block"></i><span class="text-[10px] font-mono text-red-200">El túnel de telemetría colapsó.</span></div>';
         }
     };
 
@@ -575,52 +652,60 @@ const CevicheKernel = (function() {
         setTimeout(() => {
             modal.classList.add('hidden');
             document.body.style.overflow = '';
+            document.getElementById('modal-img').src = ''; // Clear RAM
         }, 300);
-        if(STATE.abortController) STATE.abortController.abort();
+        if(STATE.abortController) {
+            STATE.abortController.abort();
+            STATE.abortController = null;
+        }
     };
 
-    const fetchVenuesForDropdown = async () => {
+    const extractSSRVenues = () => {
         const select = document.getElementById('edit-venue');
         const zeroAlert = document.getElementById('zero-state-alert');
         const formInputs = document.querySelectorAll('#edit-event-form input, #edit-event-form textarea, #btn-save-edit');
         
         try {
-            select.innerHTML = '<option value="" disabled selected>Buscando matrices en red...</option>';
-            const res = await fetch('/api/v1/venues/');
-            const data = await res.json();
-            STATE.venues = Array.isArray(data) ? data : (data.results || []);
+            const dataElement = document.getElementById('venues-data-matrix');
+            if (!dataElement) throw new Error("SSR Matrix Missing");
+            
+            STATE.venues = JSON.parse(dataElement.textContent);
 
-            if (STATE.venues.length === 0) {
+            if (!Array.isArray(STATE.venues) || STATE.venues.length === 0) {
                 select.innerHTML = '<option value="" disabled selected>0 TEATROS DISPONIBLES</option>';
                 select.disabled = true;
                 zeroAlert.classList.remove('hidden');
-                formInputs.forEach(el => {
-                    el.disabled = true;
-                    el.classList.add('opacity-50', 'cursor-not-allowed');
-                });
+                formInputs.forEach(el => { el.disabled = true; el.classList.add('opacity-50', 'cursor-not-allowed'); });
             } else {
                 select.disabled = false;
                 zeroAlert.classList.add('hidden');
-                formInputs.forEach(el => {
-                    el.disabled = false;
-                    el.classList.remove('opacity-50', 'cursor-not-allowed');
-                });
+                formInputs.forEach(el => { el.disabled = false; el.classList.remove('opacity-50', 'cursor-not-allowed'); });
                 
-                select.innerHTML = '<option value="" disabled selected>-- Selecciona el Teatro Destino --</option>';
+                const fragment = document.createDocumentFragment();
+                const defaultOpt = document.createElement('option');
+                defaultOpt.value = "";
+                defaultOpt.disabled = true;
+                defaultOpt.selected = true;
+                defaultOpt.textContent = "-- Selecciona el Teatro Destino --";
+                fragment.appendChild(defaultOpt);
+
                 STATE.venues.forEach(v => {
                     const opt = document.createElement('option');
                     opt.value = v.id;
-                    opt.textContent = `${v.name} (${v.city || 'Ubicación General'})`;
-                    select.appendChild(opt);
+                    opt.textContent = `${CryptographicSanitizer.text(v.name)} (${CryptographicSanitizer.text(v.city)})`;
+                    fragment.appendChild(opt);
                 });
+                select.innerHTML = '';
+                select.appendChild(fragment);
             }
         } catch(e) {
-            select.innerHTML = '<option value="" disabled selected>Falla Crítica DB</option>';
+            select.innerHTML = '<option value="" disabled selected>Falla Crítica DB/SSR</option>';
             select.disabled = true;
+            console.error(e);
         }
     };
 
-    const initCreateModal = async () => {
+    const initCreateModal = () => {
         const modal = document.getElementById('modal-edit-event');
         document.getElementById('edit-event-form').reset(); 
         
@@ -628,7 +713,7 @@ const CevicheKernel = (function() {
         document.getElementById('edit-active').checked = true; 
         
         document.getElementById('venue-selector-container').classList.remove('hidden');
-        await fetchVenuesForDropdown(); 
+        extractSSRVenues(); 
         
         const uploadRadio = document.querySelector('input[name="poster_method"][value="upload"]');
         if(uploadRadio) { uploadRadio.checked = true; togglePosterMethod(); }
@@ -637,7 +722,8 @@ const CevicheKernel = (function() {
         document.getElementById('btn-save-edit').innerHTML = '<i class="fa-solid fa-rocket"></i> Ejecutar Inyección';
         
         document.getElementById('stats-card').classList.add('hidden');
-        document.getElementById('pricing-section').classList.add('hidden');
+        document.getElementById('pricing-section').classList.remove('hidden');
+        document.getElementById('pricing-table-body').innerHTML = '<tr><td colspan="2" class="p-6 text-center text-[10px] uppercase font-black text-slate-500 tracking-widest bg-[#050505] border border-slate-800 rounded-lg"><i class="fa-solid fa-map-location-dot mr-2"></i> SELECCIONE UN TEATRO PARA EXTRAER ZONAS</td></tr>';
 
         modal.classList.remove('hidden');
         requestAnimationFrame(() => modal.setAttribute('data-state', 'open'));
@@ -653,7 +739,6 @@ const CevicheKernel = (function() {
         
         document.getElementById('stats-card').classList.remove('hidden');
         document.getElementById('pricing-section').classList.remove('hidden');
-        
         document.getElementById('venue-selector-container').classList.add('hidden');
         document.getElementById('zero-state-alert').classList.add('hidden');
 
@@ -662,19 +747,19 @@ const CevicheKernel = (function() {
 
         document.getElementById('stat-available').textContent = '-';
         document.getElementById('stat-progress').style.width = '0%';
-        priceBody.innerHTML = '<tr><td colspan="2" class="p-6 md:p-8 text-center text-[10px] md:text-xs font-mono text-brand-500"><i class="fa-solid fa-cog fa-spin text-lg md:text-xl block mb-2"></i> EXTRACCION DE TOPOLOGIA...</td></tr>';
+        priceBody.innerHTML = '<tr><td colspan="2" class="p-6 text-center text-[10px] font-mono text-brand-500"><i class="fa-solid fa-cog fa-spin text-lg block mb-2"></i> EXTRACCIÓN...</td></tr>';
         
         try {
-            const res = await fetch(`/dashboard/events/${id}/edit/`);
-            if(!res.ok) throw new Error("Denegación de acceso a los datos.");
+            const res = await fetch(`/dashboard/events/${encodeURIComponent(id)}/edit/`);
+            if(!res.ok) throw new Error("Denegación de acceso.");
             const data = await res.json();
             
-            document.getElementById('edit-id').value = data.id;
-            document.getElementById('edit-name').value = data.name;
-            document.getElementById('edit-date').value = data.date;
-            document.getElementById('edit-time').value = data.time;
-            document.getElementById('edit-desc').value = data.description;
-            document.getElementById('edit-active').checked = data.active;
+            document.getElementById('edit-id').value = data.id || '';
+            document.getElementById('edit-name').value = data.name || '';
+            document.getElementById('edit-date').value = data.date || '';
+            document.getElementById('edit-time').value = data.time || '';
+            document.getElementById('edit-desc').value = data.description || '';
+            document.getElementById('edit-active').checked = !!data.active;
 
             if (data.stats) {
                 document.getElementById('stat-available').textContent = data.stats.available;
@@ -686,44 +771,22 @@ const CevicheKernel = (function() {
 
                 const availEl = document.getElementById('stat-available');
                 if (data.stats.available === 0) {
-                    availEl.className = "text-2xl md:text-3xl font-mono font-bold text-red-500 drop-shadow-md"; 
+                    availEl.className = "text-2xl font-mono font-bold text-red-500 drop-shadow-md"; 
                     availEl.textContent = "OUT";
                 } else if (data.stats.available < 20) {
-                    availEl.className = "text-2xl md:text-3xl font-mono font-bold text-amber-400 drop-shadow-md";
+                    availEl.className = "text-2xl font-mono font-bold text-amber-400 drop-shadow-md";
                 } else {
-                    availEl.className = "text-2xl md:text-3xl font-mono font-bold text-emerald-400 drop-shadow-md";
+                    availEl.className = "text-2xl font-mono font-bold text-emerald-400 drop-shadow-md";
                 }
             }
 
-            priceBody.innerHTML = ''; 
-            if (data.pricing && data.pricing.length > 0) {
-                data.pricing.forEach(p => {
-                    const safeName = sanitizeHTML(p.zone_name);
-                    const safeCode = sanitizeHTML(p.zone_code);
-                    const safePrice = p.current_price > 0 ? parseFloat(p.current_price) : '';
-
-                    const tr = document.createElement('tr');
-                    tr.className = "hover:bg-white/5 transition-colors group";
-                    tr.innerHTML = `
-                        <td class="px-3 md:px-4 py-2.5 md:py-3 align-middle">
-                            <span class="bg-slate-800 text-white border border-slate-700 px-2 py-1 md:px-2.5 md:py-1 rounded-md text-[8px] md:text-[9px] font-black tracking-widest shadow-sm">${safeName}</span>
-                        </td>
-                        <td class="px-3 md:px-4 py-2.5 md:py-3">
-                            <div class="relative w-[140px] md:w-[160px] ml-auto">
-                                <span class="absolute left-3 md:left-2.5 top-1/2 -translate-y-1/2 text-emerald-500 font-bold text-xs md:text-xs">$</span>
-                                <input type="number" 
-                                       name="prices[${safeCode}]" 
-                                       value="${safePrice}" 
-                                       class="w-full bg-[#0b0b0e] border border-slate-700 rounded-lg pl-7 md:pl-7 pr-3 md:pr-3 py-2.5 md:py-2.5 text-right text-white text-xs md:text-xs font-mono focus:border-emerald-500 outline-none transition-all placeholder:text-slate-700 focus:ring-1 focus:ring-emerald-500 group-hover:border-slate-500 shadow-inner" 
-                                       placeholder="0.00" min="0" step="1000">
-                            </div>
-                        </td>
-                    `;
-                    priceBody.appendChild(tr);
-                });
-            } else {
-                priceBody.innerHTML = '<tr><td colspan="2" class="p-5 md:p-6 text-center text-[9px] md:text-[10px] uppercase font-black text-amber-500 tracking-widest bg-amber-500/10 border-t border-b border-amber-500/20"><i class="fa-solid fa-triangle-exclamation mr-1 md:mr-2"></i> Sin zonas registradas en la topología</td></tr>';
+            // Mapea la estructura del servidor {zone_code, current_price} para la función dinámica
+            const zones = data.pricing ? data.pricing.map(p => p.zone_code) : [];
+            const pricesMap = {};
+            if(data.pricing) {
+                data.pricing.forEach(p => { pricesMap[p.zone_code] = p.current_price; });
             }
+            renderPricingTableFromZones(zones, pricesMap);
 
             modal.classList.remove('hidden');
             requestAnimationFrame(() => modal.setAttribute('data-state', 'open'));
@@ -739,23 +802,24 @@ const CevicheKernel = (function() {
         setTimeout(() => {
             modal.classList.add('hidden');
             document.body.style.overflow = '';
+            document.getElementById('edit-event-form').reset(); // Clear Heap
         }, 300);
     };
 
     const execDelete = async (id) => {
-        if(!confirm("⚠️ ADVERTENCIA CRÍTICA: ¿Estás seguro de que deseas purgar este nodo? Esta acción es irreversible y destruirá los metadatos y ventas asociadas en Postgres.")) return;
+        if(!confirm("⚠️ PROTOCOLO DE PURGA: ¿Estás seguro de que deseas destruir este nodo y sus métricas de PostgreSQL? Acción irreversible.")) return;
 
         if (STATE.isRequestPending) return;
         STATE.isRequestPending = true;
 
         try {
-            const res = await fetch(`/dashboard/events/${id}/delete/`, {
+            const res = await fetch(`/dashboard/events/${encodeURIComponent(id)}/delete/`, {
                 method: 'POST',
-                headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+                headers: { 'X-CSRFToken': getCSRFToken() }
             });
 
             if(res.ok) {
-                spawnToast("Nodo erradicado con éxito. Purga completa.", "success");
+                spawnToast("Nodo erradicado. Purga completa.", "success");
                 setTimeout(() => window.location.reload(), 1200);
             } else {
                 throw new Error("Fallo en la purga del servidor.");
@@ -776,12 +840,23 @@ const CevicheKernel = (function() {
             const venueSelect = document.getElementById('edit-venue');
             const isCreation = !document.getElementById('edit-id').value;
             if (isCreation && (!venueSelect.value || venueSelect.value === "")) {
-                spawnToast("Abortado: Debes vincular el evento a un Teatro.", "error");
+                spawnToast("Abortado: El Evento exige vinculación topológica (Teatro).", "error");
                 return;
             }
 
             if (STATE.isRequestPending) return;
             
+            // 🛡️ Client-Side File Scanning
+            const fileInput = document.getElementById('edit-poster-file');
+            if (fileInput.files.length > 0) {
+                try {
+                    await BinaryScanner.validateImage(fileInput.files[0]);
+                } catch(err) {
+                    spawnToast(err.message, "error");
+                    return;
+                }
+            }
+
             STATE.isRequestPending = true;
             const id = document.getElementById('edit-id').value;
             const btn = document.getElementById('btn-save-edit');
@@ -793,12 +868,12 @@ const CevicheKernel = (function() {
             const formData = new FormData(this); 
             formData.set('active', document.getElementById('edit-active').checked);
 
-            const targetUrl = id ? `/dashboard/events/${id}/edit/` : '/dashboard/events/create/';
+            const targetUrl = id ? `/dashboard/events/${encodeURIComponent(id)}/edit/` : '/dashboard/events/create/';
 
             try {
                 const res = await fetch(targetUrl, {
                     method: 'POST',
-                    headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+                    headers: { 'X-CSRFToken': getCSRFToken() },
                     body: formData
                 });
 
@@ -816,7 +891,10 @@ const CevicheKernel = (function() {
                 btn.innerHTML = originalText;
                 btn.disabled = false;
                 STATE.isRequestPending = false; 
-            } 
+            } finally {
+                // Ayuda al Garbage Collector
+                formData.delete('poster');
+            }
         });
     };
 
@@ -825,11 +903,22 @@ const CevicheKernel = (function() {
             if (e.key === "Escape") {
                 const modalDetails = document.getElementById('modal-details');
                 const modalEdit = document.getElementById('modal-edit-event');
-                
                 if (modalDetails && modalDetails.getAttribute('data-state') === 'open') closeDetailsUI();
                 if (modalEdit && modalEdit.getAttribute('data-state') === 'open') closeEditUI();
             }
         });
+
+        // 🚀 LISTENER GOD-TIER: Extrae y renderiza precios instantáneamente (O(1)) al elegir teatro
+        const venueSelect = document.getElementById('edit-venue');
+        if(venueSelect) {
+            venueSelect.addEventListener('change', function(e) {
+                const venueId = e.target.value;
+                const venue = STATE.venues.find(v => v.id === venueId);
+                if (venue) {
+                    renderPricingTableFromZones(venue.zones, {});
+                }
+            });
+        }
     };
 
     const init = () => {
@@ -839,7 +928,8 @@ const CevicheKernel = (function() {
 
     document.addEventListener("DOMContentLoaded", init);
 
-    return {
+    // 🛡️ API PÚBLICA SEGURIZADA
+    return Object.freeze({
         togglePosterMethod: togglePosterMethod,
         openEventDetails: fetchDetails,
         closeDetails: closeDetailsUI,
@@ -847,7 +937,7 @@ const CevicheKernel = (function() {
         openEditModal: fetchAndOpenEdit,
         closeEditModal: closeEditUI,
         deleteEventNode: execDelete 
-    };
+    });
 
 })(); 
 </script>

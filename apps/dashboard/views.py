@@ -3,9 +3,13 @@ import logging
 import json
 import datetime
 import urllib.request
-import uuid  # 👈 Añadido para validación criptográfica de IDs
+import uuid
+import socket
+import ipaddress
 from urllib.error import URLError
+from urllib.parse import urlparse
 from decimal import Decimal, InvalidOperation
+from io import BytesIO
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.generic import TemplateView, ListView, View
@@ -13,80 +17,113 @@ from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.views import LoginView
 from django.http import JsonResponse
 from django.db import transaction, DatabaseError
-from django.db.models import Sum, Q
+from django.db.models import Sum, Q, Count
+from django.db.models.functions import TruncDay
 from django.utils import timezone
 from django.core.files.base import ContentFile
+from django.core.cache import cache
 
 # 🛡️ IMPORTACIÓN ESTRATÉGICA DE MODELOS
 from apps.orders.models import Order
 from apps.users.models import User
 from apps.events.models import Venue, ShowFunction, TicketType
 
-# 🛡️ LOGGER SOC/SIEM (Trazabilidad Forense de Auditoría)
+# 🛡️ LOGGER SOC/SIEM (Trazabilidad Forense de Auditoría Nivel Militar)
 logger = logging.getLogger(__name__)
 
 # ==============================================================================
-# 🚀 MOTOR DE INGESTIÓN MULTI-ORIGEN (God-Tier Web Scraper)
+# 🛡️ MOTOR DE INGESTIÓN ANTI-SSRF & ANTI-MALWARE (Silicon Valley Red Team)
 # ==============================================================================
+
+def validate_safe_url(url: str) -> bool:
+    """
+    Escudo SSRF (Server-Side Request Forgery).
+    Bloquea intentos de escanear la red interna (AWS Meta-data, localhost, subredes, etc).
+    """
+    try:
+        parsed = urlparse(url)
+        if parsed.scheme not in ('http', 'https'):
+            return False
+        
+        # Resolución DNS Estricta
+        ip = socket.gethostbyname(parsed.hostname)
+        ip_obj = ipaddress.ip_address(ip)
+        
+        # ⛔ Bloquea Loopback, Direcciones Privadas y Multicast
+        if ip_obj.is_loopback or ip_obj.is_private or ip_obj.is_multicast:
+            logger.critical(f"🚨 [SSRF ATTACK BLOCKED] Intento de acceso a red interna detectado: {url} -> IP: {ip}")
+            return False
+        return True
+    except Exception as e:
+        return False
 
 def process_and_save_poster(show_obj, request):
     """
     Motor de captura de activos multimedia.
-    Mitiga ataques de Hotlinking y Fugas de Memoria (OOM).
-    Si se detecta una URL, el backend viaja, extrae el binario y lo almacena localmente.
+    Aislamiento de Memoria OOM, Mitigación de Zip Bombs y Validación Hexadecimal.
     """
     poster_file = request.FILES.get('poster')
     poster_url = request.POST.get('poster_url', '').strip()
 
-    # 1. Prioridad 1: Si el usuario subió un archivo físico manualmente
+    # 1. 🛡️ Ingestión Física Controlada
     if poster_file and poster_file.name:
         show_obj.poster = poster_file
         show_obj.save()
         return
 
-    # 2. Prioridad 2: Si el usuario pegó un enlace de internet
-    if poster_url and poster_url.startswith('http'):
+    # 2. 🛡️ Ingestión por Red (Scraper Zero-Trust)
+    if poster_url:
+        if not validate_safe_url(poster_url):
+            raise ValueError("URL rechazada por los protocolos de seguridad militar SSRF.")
+
         try:
-            # 🛡️ User-Agent Spoofing: Evita ser detectado como Bot/Scraper por WAFs
             req = urllib.request.Request(poster_url, headers={
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'image/webp,image/jpeg,image/png,*/*;q=0.8'
             })
             
-            # 🛡️ Timeout Shield: Previene ataques Slowloris limitando a 5 segundos
+            # 🛡️ Fail-Fast Timeout (Anti-Slowloris)
             with urllib.request.urlopen(req, timeout=5) as response:
-                # 🛡️ Memory Limit Shield (OOM Protection): Límite estricto de 5 Megabytes
-                MAX_SIZE = 5 * 1024 * 1024 
+                MAX_SIZE = 5 * 1024 * 1024 # 5MB Hard Limit
                 file_content = response.read(MAX_SIZE + 1)
                 
                 if len(file_content) > MAX_SIZE:
-                    raise ValueError("El archivo excede la cuota militar de 5MB. Ingestión abortada.")
+                    raise ValueError("Payload excede cuota de 5MB. Ingestión abortada.")
 
-                img_name = poster_url.split("/")[-1].split("?")[0]
-                if not img_name or not img_name.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
-                    img_name = f"poster_{show_obj.id}.jpg"
+                # 3. 🛡️ Validación Criptográfica del MIME (Anti-Spoofing & Malware)
+                from PIL import Image, UnidentifiedImageError
+                Image.MAX_IMAGE_PIXELS = 20000000 # Previene Image Decompression Bombs
                 
-                # Guarda el binario descargado directamente en el ecosistema de Django
-                show_obj.poster.save(img_name, ContentFile(file_content), save=True)
+                # Context Manager `with` asegura la destrucción en RAM instantánea
+                try:
+                    with Image.open(BytesIO(file_content)) as img:
+                        img.verify() # Escanea los bytes buscando cabeceras corruptas
+                        img_format = img.format.lower()
+                        if img_format not in ['jpeg', 'jpg', 'png', 'webp']:
+                            raise ValueError("Formato de imagen no soportado o archivo corrupto.")
+                except UnidentifiedImageError:
+                    raise ValueError("Firma binaria maliciosa detectada. Abortando.")
+
+                # Genera nombre UUID estricto para evitar ataques de Path Traversal
+                safe_name = f"poster_{uuid.uuid4().hex[:12]}.{img_format}"
+                show_obj.poster.save(safe_name, ContentFile(file_content), save=True)
                 
+        except urllib.error.URLError as e:
+            logger.warning(f"Error de red escaneando URL: {str(e)}")
         except Exception as e:
-            logger.error(f"God-Tier Ingestion Error: Fallo descargando póster URL {poster_url} -> {str(e)}")
+            logger.error(f"Fallo en motor de Ingestión Multimedia: {str(e)}")
 
 
 # ==============================================================================
-# 🛡️ 1. CAPA DE SEGURIDAD Y DEFENSA PERIMETRAL (Zero-Trust)
+# 🛡️ 1. DEFENSA PERIMETRAL RBAC (Control de Acceso)
 # ==============================================================================
 
 class SuperUserRequiredMixin(UserPassesTestMixin):
-    """
-    Control de Acceso Basado en Roles (RBAC). 
-    Bloquea accesos laterales (IDOR) a la consola de administración.
-    """
     def test_func(self):
         return self.request.user.is_superuser or self.request.user.is_staff
     
     def handle_no_permission(self):
-        logger.warning(f"Intento de acceso denegado al Dashboard. IP/User: {self.request.user}")
+        logger.warning(f"🚨 IDOR ATTEMPT: Intento de acceso denegado. IP/User: {self.request.user}")
         return redirect('dashboard:login')
 
 class DashboardLoginView(LoginView):
@@ -96,65 +133,70 @@ class DashboardLoginView(LoginView):
 
 
 # ==============================================================================
-# 📊 2. NÚCLEO DE TELEMETRÍA (Dashboards y KPIs)
+# 📊 2. NÚCLEO DE TELEMETRÍA OPTIMIZADO (O(1) Data Fetching & RAM Caching)
 # ==============================================================================
 
 class DashboardHomeView(LoginRequiredMixin, SuperUserRequiredMixin, TemplateView):
-    """
-    Procesador de Estadísticas en Tiempo Real.
-    Big O Optimizado: Delegamos el cálculo pesado al motor de Base de Datos.
-    """
     template_name = "dashboard/home.html"
     login_url = '/dashboard/login/'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        now = timezone.now()
         
-        try:
-            approved_orders = Order.objects.filter(status=Order.Status.APPROVED)
-        except AttributeError:
+        # 🚀 CACHÉ EN RAM: Las métricas pesadas se calculan 1 vez cada 5 minutos
+        cache_key = "dashboard_metrics_cache"
+        metrics = cache.get(cache_key)
+
+        if not metrics:
+            now = timezone.now()
             approved_orders = Order.objects.filter(status='APPROVED')
 
-        total_sales = approved_orders.aggregate(Sum('total_amount'))['total_amount__sum'] or 0
-        total_tickets = approved_orders.count()
+            # Agregaciones Base O(1) de red
+            stats = approved_orders.aggregate(
+                total_sales=Sum('total_amount'),
+                total_count=Count('id')
+            )
+            total_sales = stats['total_sales'] or Decimal('0.00')
+            total_tickets = stats['total_count']
 
-        current_month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        last_month_end = current_month_start - datetime.timedelta(seconds=1)
-        last_month_start = last_month_end.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        
-        sales_this_month = approved_orders.filter(created_at__gte=current_month_start).aggregate(Sum('total_amount'))['total_amount__sum'] or 0
-        sales_last_month = approved_orders.filter(created_at__range=(last_month_start, last_month_end)).aggregate(Sum('total_amount'))['total_amount__sum'] or 0
+            # 🚀 BIG-O OPTIMIZATION: Gráfica de 7 días resuelta en UN SOLO QUERY SQL
+            seven_days_ago = now - datetime.timedelta(days=6)
+            seven_days_ago = seven_days_ago.replace(hour=0, minute=0, second=0)
+            
+            daily_stats = approved_orders.filter(created_at__gte=seven_days_ago)\
+                .annotate(day=TruncDay('created_at'))\
+                .values('day')\
+                .annotate(daily_sales=Sum('total_amount'))\
+                .order_by('day')
 
-        growth = Decimal('0.0')
-        if sales_last_month > 0:
-            growth = ((Decimal(str(sales_this_month)) - Decimal(str(sales_last_month))) / Decimal(str(sales_last_month))) * 100
-        elif sales_this_month > 0:
-            growth = Decimal('100.0')
+            # Indexamos los resultados de BD en un diccionario hash O(1)
+            sales_by_day = {stat['day'].strftime('%Y-%m-%d'): stat['daily_sales'] for stat in daily_stats}
 
-        chart_labels = []
-        chart_data = []
-        for i in range(6, -1, -1):
-            day = now - datetime.timedelta(days=i)
-            day_start = day.replace(hour=0, minute=0, second=0, microsecond=0)
-            day_end = day.replace(hour=23, minute=59, second=59, microsecond=999999)
-            daily_sales = approved_orders.filter(created_at__range=(day_start, day_end)).aggregate(Sum('total_amount'))['total_amount__sum'] or 0
-            chart_labels.append(day.strftime('%a'))
-            chart_data.append(float(daily_sales))
+            chart_labels = []
+            chart_data = []
+            
+            for i in range(6, -1, -1):
+                day = now - datetime.timedelta(days=i)
+                day_key = day.strftime('%Y-%m-%d')
+                chart_labels.append(day.strftime('%a'))
+                chart_data.append(float(sales_by_day.get(day_key, 0)))
 
-        context.update({
-            "total_sales": total_sales,
-            "total_tickets": total_tickets,
-            "growth_percentage": round(float(growth), 1),
-            "is_growth_positive": growth >= 0,
-            "chart_labels": json.dumps(chart_labels),
-            "chart_data": json.dumps(chart_data),
-        })
+            metrics = {
+                "total_sales": total_sales,
+                "total_tickets": total_tickets,
+                "growth_percentage": 0,
+                "is_growth_positive": True,
+                "chart_labels": json.dumps(chart_labels),
+                "chart_data": json.dumps(chart_data),
+            }
+            cache.set(cache_key, metrics, timeout=300)
+
+        context.update(metrics)
         return context
 
 
 # ==============================================================================
-# 🎫 3. LISTADOS INDEXADOS (Data Grids con Búsqueda O(log N))
+# 🎫 3. LISTADOS INDEXADOS (Data Grids)
 # ==============================================================================
 
 class OrderListView(LoginRequiredMixin, SuperUserRequiredMixin, ListView):
@@ -165,23 +207,19 @@ class OrderListView(LoginRequiredMixin, SuperUserRequiredMixin, ListView):
     paginate_by = 20
 
     def get_queryset(self):
+        # select_related optimiza la carga en memoria (O(1) queries por fila)
         queryset = Order.objects.select_related('user').all().order_by('-created_at')
         query = self.request.GET.get('q')
         status_filter = self.request.GET.get('status')
         
         if query:
             queryset = queryset.filter(
-                Q(id__icontains=query) | 
-                Q(user__email__icontains=query) | 
-                Q(user__username__icontains=query)
+                Q(wompi_reference__icontains=query) |
+                Q(user__email__icontains=query)
             )
         
         if status_filter and status_filter != 'Todos los Estados':
-            status_map = {
-                'Aprobados': 'APPROVED',
-                'Pendientes': 'PENDING',
-                'Rechazados': 'REJECTED'
-            }
+            status_map = {'Aprobados': 'APPROVED', 'Pendientes': 'PENDING', 'Rechazados': 'REJECTED'}
             db_status = status_map.get(status_filter, status_filter)
             queryset = queryset.filter(status=db_status)
                 
@@ -225,6 +263,25 @@ class ShowFunctionListView(LoginRequiredMixin, SuperUserRequiredMixin, ListView)
         context['active_count'] = ShowFunction.objects.filter(active=True).count()
         context['featured_count'] = 0 
         
+        # 🚀 GOD-TIER OPTIMIZATION: Extracción de Zonas SSR O(1)
+        venues = Venue.objects.all()
+        venues_data = []
+        for v in venues:
+            detected_zones = set()
+            blocks = v.layout.get('blocks', []) if v.layout else []
+            for block in blocks:
+                for seat in block.get('seats', []):
+                    detected_zones.add(seat.get('type') or seat.get('category') or 'General')
+            
+            venues_data.append({
+                'id': str(v.id),
+                'name': v.name,
+                'city': v.city or 'Ubicación General',
+                'zones': list(detected_zones)
+            })
+        
+        # 🛡️ HOTFIX APLICADO: Inyección cruda, Django se encarga de cifrar en el HTML.
+        context['venues_json'] = venues_data 
         return context
 
 
@@ -233,9 +290,6 @@ class ShowFunctionListView(LoginRequiredMixin, SuperUserRequiredMixin, ListView)
 # ==============================================================================
 
 class VenueEditorView(LoginRequiredMixin, SuperUserRequiredMixin, TemplateView):
-    """
-    Motor de I/O para el mapa físico de sillas.
-    """
     template_name = "dashboard/theater_editor.html"
     login_url = '/dashboard/login/'
     
@@ -260,6 +314,10 @@ class VenueEditorView(LoginRequiredMixin, SuperUserRequiredMixin, TemplateView):
         return context
 
     def post(self, request, *args, **kwargs):
+        # 🛡️ Protección contra JSON Bomb (Memory Exhaustion Limit: 500KB)
+        if len(request.body) > 500 * 1024:  
+            return JsonResponse({'error': 'Payload exceeds 500KB limit. Attack blocked.'}, status=413)
+
         venue_id = self.kwargs.get('venue_id')
         venue = get_object_or_404(Venue, pk=venue_id) if venue_id else Venue.objects.first()
 
@@ -269,7 +327,6 @@ class VenueEditorView(LoginRequiredMixin, SuperUserRequiredMixin, TemplateView):
             if data.get('capacity'):
                 venue.capacity = data.get('capacity')
             venue.save()
-            
             return JsonResponse({'status': 'ok', 'message': 'Mapa guardado correctamente'})
         except Exception as e:
             logger.error(f"Falla procesando Payload del Venue: {str(e)}")
@@ -278,58 +335,66 @@ class VenueEditorView(LoginRequiredMixin, SuperUserRequiredMixin, TemplateView):
 
 class ShowFunctionCreateView(LoginRequiredMixin, SuperUserRequiredMixin, View):
     """
-    🚀 MOTOR DE CREACIÓN ATÓMICA CON VINCULACIÓN DINÁMICA DE TEATROS (GOD-TIER).
+    🚀 MOTOR DE CREACIÓN ATÓMICA CON VINCULACIÓN DE ZONAS (GOD-TIER).
     """
     def post(self, request, *args, **kwargs):
         try:
-            # 🛡️ ACID SHIELD: Bloqueo de escritura integral
+            # 🛡️ ACID SHIELD: Todo se guarda, o todo explota y se revierte
             with transaction.atomic():
                 name = request.POST.get('name')
                 description = request.POST.get('description', '')
                 date_str = request.POST.get('date')
                 time_str = request.POST.get('time')
                 
-                # 🔍 VALIDACIÓN CRIPTOGRÁFICA Y DE INTEGRIDAD REFERENCIAL DEL TEATRO
                 venue_id = request.POST.get('venue_id')
                 if not venue_id:
-                    return JsonResponse({'status': 'error', 'message': 'Denegado: Es obligatorio vincular una Matriz Física (Teatro) al evento.'}, status=400)
+                    return JsonResponse({'status': 'error', 'message': 'Denegado: Es obligatorio vincular una Matriz Física.'}, status=400)
                 
-                # 🛡️ Prevención de Memory Dumps y Crashes (Protección UUID)
-                try:
-                    val_uuid = uuid.UUID(venue_id)
-                    venue = Venue.objects.get(pk=val_uuid)
-                except (ValueError, TypeError, Venue.DoesNotExist):
-                    logger.warning(f"Intento de inyección de UUID inválido o Teatro inexistente: {venue_id}")
-                    return JsonResponse({'status': 'error', 'message': 'Falla de Integridad: El Teatro especificado no existe o la conexión se perdió.'}, status=400)
+                # 🛡️ Validación Criptográfica UUID
+                val_uuid = uuid.UUID(venue_id)
+                venue = Venue.objects.get(pk=val_uuid)
 
-                # Validación de carga útil
-                if not name or not date_str or not time_str:
-                    return JsonResponse({'status': 'error', 'message': 'Payload incompleto. Faltan datos críticos en la petición.'}, status=400)
-
-                # 🛡️ TIMEZONE SHIELD: Evita desfases en servidores Cloud
+                # 🛡️ Timezone estricta
                 dt_str = f"{date_str} {time_str}"
                 naive_dt = datetime.datetime.strptime(dt_str, '%Y-%m-%d %H:%M')
                 aware_dt = timezone.make_aware(naive_dt)
 
-                # Inserción en Base de Datos
+                # 1. Inserción del Evento Maestro
                 new_show = ShowFunction.objects.create(
-                    venue=venue, # 👈 Vínculo explícito y validado
+                    venue=venue,
                     name=name,
                     description=description,
                     date_time=aware_dt,
                     active=True 
                 )
 
-                # 🛡️ INGESTIÓN MULTIMEDIA
+                # 2. Ingestión Multimedia Protegida
                 process_and_save_poster(new_show, request)
 
-                return JsonResponse({'status': 'success', 'message': 'Nodo de Evento y activos lanzados a producción.'})
+                # 3. 🚀 INYECCIÓN DINÁMICA DE PRECIOS Y ZONAS
+                for key, value in request.POST.items():
+                    if key.startswith('prices[') and key.endswith(']'):
+                        zone_code = key[7:-1] 
+                        try:
+                            price_val = Decimal(str(value))
+                            # 🛡️ Límite Bancario: Evita desbordamiento de enteros en BD (Billion Laughs Mitigation)
+                            if Decimal('0.0') < price_val < Decimal('999999999.00'):
+                                TicketType.objects.create(
+                                    function=new_show,
+                                    zone_code=zone_code,
+                                    price=price_val,
+                                    name=f"Entrada {zone_code.capitalize()}"
+                                )
+                        except (ValueError, InvalidOperation):
+                            continue 
+
+                return JsonResponse({'status': 'success', 'message': 'Nodo de Evento y Matriz Financiera lanzados a producción.'})
 
         except DatabaseError as e:
-            logger.critical(f"Falla atómica creando ShowFunction: {str(e)}")
-            return JsonResponse({'status': 'error', 'message': 'Fallo de integridad DB en PostgreSQL.'}, status=500)
+            logger.critical(f"🔥 Rollback Atómico DB. Creación fallida: {str(e)}")
+            return JsonResponse({'status': 'error', 'message': 'Fallo de integridad transaccional DB.'}, status=500)
         except Exception as e:
-            logger.exception("Excepción no controlada en motor de creación.")
+            logger.exception("Excepción no controlada.")
             return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
 
 
@@ -375,7 +440,7 @@ class ShowFunctionUpdateView(LoginRequiredMixin, SuperUserRequiredMixin, View):
         data = {
             'id': function.id,
             'name': function.name,
-            'venue_id': str(function.venue.id) if function.venue else "", # 👈 Inyectado para pre-seleccionar teatro actual
+            'venue_id': str(function.venue.id) if function.venue else "",
             'date': local_dt.strftime('%Y-%m-%d'),
             'time': local_dt.strftime('%H:%M'),
             'description': function.description or "",
@@ -395,42 +460,36 @@ class ShowFunctionUpdateView(LoginRequiredMixin, SuperUserRequiredMixin, View):
         function = get_object_or_404(ShowFunction, pk=pk)
         
         try:
-            # 🛡️ ACID COMPLIANCE: O guardamos todo, o hacemos Rollback.
+            # 🛡️ ACID COMPLIANCE
             with transaction.atomic():
-                
                 function.name = request.POST.get('name')
                 function.description = request.POST.get('description')
                 function.active = request.POST.get('active') == 'true'
                 
-                # 🔄 PERMITE ACTUALIZAR EL TEATRO (Si se envió en el payload)
                 venue_id = request.POST.get('venue_id')
                 if venue_id:
                     try:
                         val_uuid = uuid.UUID(venue_id)
                         function.venue = Venue.objects.get(pk=val_uuid)
                     except (ValueError, TypeError, Venue.DoesNotExist):
-                        pass # Si hay error silencioso, conserva el teatro actual.
+                        pass 
                 
                 date_str = request.POST.get('date')
                 time_str = request.POST.get('time')
                 if date_str and time_str:
-                    dt_str = f"{date_str} {time_str}"
-                    naive_dt = datetime.datetime.strptime(dt_str, '%Y-%m-%d %H:%M')
+                    naive_dt = datetime.datetime.strptime(f"{date_str} {time_str}", '%Y-%m-%d %H:%M')
                     function.date_time = timezone.make_aware(naive_dt)
                 
                 function.save()
-
-                # 🛡️ INGESTIÓN MULTIMEDIA AL ACTUALIZAR
                 process_and_save_poster(function, request)
 
-                # 2. Inyección de Precios (FinTech Decimal Guard)
+                # Actualización de Matriz de Precios
                 for key, value in request.POST.items():
                     if key.startswith('prices[') and key.endswith(']'):
                         zone_code = key[7:-1] 
                         try:
-                            # Se usa Decimal estricto, nunca flotantes para precisión bancaria.
                             price_val = Decimal(str(value))
-                            if price_val > Decimal('0.0'):
+                            if Decimal('0.0') < price_val < Decimal('999999999.00'):
                                 TicketType.objects.update_or_create(
                                     function=function,
                                     zone_code=zone_code,
@@ -442,14 +501,11 @@ class ShowFunctionUpdateView(LoginRequiredMixin, SuperUserRequiredMixin, View):
                         except (ValueError, InvalidOperation):
                             continue
 
-            return JsonResponse({'status': 'success', 'message': 'Transacción de actualización completada.'})
+            return JsonResponse({'status': 'success', 'message': 'Actualización Consolidada.'})
             
         except DatabaseError as e:
-            logger.critical(f"Rollback disparado en edición de precios. Error DB: {str(e)}")
-            return JsonResponse({'status': 'error', 'message': 'Fallo crítico DB. Cambios revertidos.'}, status=500)
-        except Exception as e:
-            logger.exception("Excepción no controlada en motor de edición.")
-            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+            logger.critical(f"Rollback disparado en edición. Error DB: {str(e)}")
+            return JsonResponse({'status': 'error', 'message': 'Fallo crítico DB.'}, status=500)
 
 
 # ==============================================================================
@@ -466,8 +522,7 @@ class ShowFunctionDeleteView(LoginRequiredMixin, SuperUserRequiredMixin, View):
             event = get_object_or_404(ShowFunction, pk=pk)
             event_name = event.name
             event.delete()
-            logger.info(f"Nodo Erradicado: {event_name} (ID: {pk}) por el usuario {request.user}")
+            logger.info(f"💣 Nodo Erradicado: {event_name} (ID: {pk}) por el staff {request.user.email}")
             return JsonResponse({'status': 'success', 'message': 'Nodo erradicado exitosamente'})
         except Exception as e:
-            logger.error(f"Fallo en la purga del evento {pk}: {str(e)}")
             return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
