@@ -1,4 +1,3 @@
-# apps/website/views.py
 import logging
 import json
 from decimal import Decimal
@@ -11,12 +10,13 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from django.core.serializers.json import DjangoJSONEncoder
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.exceptions import PermissionDenied
 
 # Importaciones de modelos
 from apps.orders.models import Order
 from apps.events.models import ShowFunction, Venue
 
-# 🛡️ LOGGER SOC/SIEM (Reemplazo absoluto de los 'print' bloqueantes)
+# 🛡️ LOGGER SOC/SIEM (Reemplazo absoluto de prints bloqueantes)
 logger = logging.getLogger(__name__)
 
 # ==============================================================================
@@ -103,7 +103,7 @@ def event_detail_view(request, event_id):
 
     # 2. CLONACIÓN DE ALTA VELOCIDAD (Mitigación de Memory Exhaustion)
     raw_layout = venue.layout if (venue and venue.layout) else {}
-    # Utilizamos la librería JSON en C que es exponencialmente más rápida que copy.deepcopy()
+    # 🛡️ Uso de librería JSON nativa (C backend) exponencialmente más rápida que copy.deepcopy()
     layout_data = json.loads(json.dumps(raw_layout))
 
     # Contadores de Telemetría
@@ -148,14 +148,14 @@ def event_detail_view(request, event_id):
     # 4. VOLCADO DE TELEMETRÍA ASÍNCRONO (Logging No Bloqueante)
     if unmatched_zones:
         logger.warning(
-            f"🚨 [ANOMALÍA DE PRECIOS] Evento ID {function.id}: Zonas en mapa sin precio configurado: {list(unmatched_zones)}"
+            f"🚨 [ANOMALÍA DE PRECIOS] Evento ID {function.id}: Zonas en mapa sin precio: {list(unmatched_zones)}"
         )
     
     logger.info(
-        f"📊 [MATRIZ PROCESADA] Evento: {function.name} | Sillas Asignadas: {seats_vip_ok} | Rescatadas (General): {seats_rescued}"
+        f"📊 [MATRIZ PROCESADA] Evento: {function.name} | Sillas Asignadas: {seats_vip_ok} | Rescatadas: {seats_rescued}"
     )
 
-    # 5. RETORNO DE PAQUETES
+    # 5. RETORNO DE PAQUETES AL FRONTEND
     venue_layout_json = json.dumps(layout_data, cls=DjangoJSONEncoder)
 
     context = {
@@ -174,19 +174,23 @@ def event_detail_view(request, event_id):
 
 def order_status_view(request, order_id):
     """
-    Verificador Criptográfico de Estado de Órdenes.
+    Verificador Criptográfico de Estado de Órdenes con Frontend Polling Support.
     """
-    order = get_object_or_404(Order, id=order_id)
+    # 🚀 ANTI-N+1: Traemos los tickets y la función de antemano si la orden existe
+    order = get_object_or_404(Order.objects.prefetch_related('tickets__function'), id=order_id)
+    
+    # 🛡️ PROTECCIÓN IDOR: Nadie puede ver una orden ajena si está vinculada a un usuario
+    if order.user and order.user != request.user:
+        logger.warning(f"🚨 [SPOOFING MITIGADO] Intento de acceso a bóveda ajena: {order_id} por IP {request.META.get('REMOTE_ADDR')}")
+        raise PermissionDenied("Acceso denegado a la bóveda criptográfica.")
     
     status_str = str(order.status).upper()
-    if hasattr(Order.Status, 'APPROVED'):
-        is_approved = (order.status == Order.Status.APPROVED)
-    else:
-        is_approved = (status_str == 'APPROVED')
+    is_approved = (status_str == 'APPROVED')
 
     context = {
         'order': order,
-        # Aislamiento de seguridad: Solo se exponen los tickets si la bóveda fue aprobada.
+        'status_str': status_str,  # 🚀 VITAL: Inyectado para que el JS de la plantilla ejecute el Polling
+        # Aislamiento de seguridad: Solo se exponen los objetos si la bóveda fue aprobada.
         'tickets': order.tickets.all() if is_approved else [],
         'wompi_public_key': getattr(settings, 'WOMPI_PUBLIC_KEY', '')
     }
@@ -204,9 +208,16 @@ class MisTicketsView(LoginRequiredMixin, TemplateView):
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        # 🚀 ANTI N+1 SHIELD: prefetch_related neutraliza llamadas masivas a la DB al listar tickets.
-        context['my_orders'] = Order.objects.filter(
+        
+        # 🚀 ANTI N+1 SHIELD: prefetch_related neutraliza llamadas masivas a la DB al listar tickets
+        orders = Order.objects.filter(
             user=self.request.user, 
             status='APPROVED'
-        ).prefetch_related('tickets').order_by('-created_at')
+        ).prefetch_related('tickets__function').order_by('-created_at')
+        
+        # En caso de usar la misma plantilla order_status.html, simulamos el estado de la primera orden para el UI
+        # o puedes adaptar una plantilla 'mis_tickets.html' para iterar sobre todas las órdenes.
+        context['my_orders'] = orders
+        context['status_str'] = 'APPROVED'
+        
         return context
