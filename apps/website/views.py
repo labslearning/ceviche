@@ -8,6 +8,7 @@ from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from django.core.serializers.json import DjangoJSONEncoder
+from django.contrib.auth.mixins import LoginRequiredMixin
 
 # Importaciones de modelos
 from apps.orders.models import Order
@@ -207,3 +208,20 @@ def order_status_view(request, order_id):
     }
     
     return render(request, 'order_status.html', context)
+
+class MisTicketsView(LoginRequiredMixin, TemplateView):
+    """
+    Portal God-Tier de Inventario Personal.
+    Aísla las órdenes aprobadas del usuario autenticado.
+    """
+    template_name = "order_status.html" # Puedes cambiar esto por "mis_tickets.html" cuando crees el diseño final
+    login_url = '/' # Redirección silenciosa si un invitado intenta acceder
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # O(1) Query optimizada usando prefetch_related para evitar el N+1 problem al cargar los tickets
+        context['my_orders'] = Order.objects.filter(
+            user=self.request.user, 
+            status='APPROVED'
+        ).prefetch_related('tickets').order_by('-created_at')
+        return context

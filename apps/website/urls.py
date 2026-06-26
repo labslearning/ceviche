@@ -4,7 +4,8 @@ from .views import (
     BoleteriaView, 
     CartView, 
     event_detail_view, 
-    order_status_view
+    order_status_view,
+    MisTicketsView # 🚀 IMPORTACIÓN AÑADIDA
 )
 
 urlpatterns = [
@@ -18,9 +19,11 @@ urlpatterns = [
     path('cart/', CartView.as_view(), name='cart'),
     
     # 🎫 Detalle del Evento (Selección de sillas)
-    # Usamos <uuid:event_id> asumiendo que tus IDs son UUIDs (como en Orders)
     path('events/<uuid:event_id>/', event_detail_view, name='event_detail'),
     
-    # ✅ Estado de la Orden (Post-Pago)
+    # ✅ Estado de la Orden (Post-Pago Específico)
     path('orders/<uuid:order_id>/status/', order_status_view, name='order_status'),
+    
+    # 🚀 LA BÓVEDA DEL USUARIO (El Endpoint de Mercado Pago)
+    path('mis-tickets/', MisTicketsView.as_view(), name='mis_tickets'), 
 ]
