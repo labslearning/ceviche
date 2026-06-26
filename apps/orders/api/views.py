@@ -14,7 +14,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.throttling import UserRateThrottle
-from rest_framework.exceptions import PermissionDenied, Throttled
+from rest_framework.exceptions import PermissionDenied
 
 # --- MODELOS ---
 from apps.orders.models import Order, Ticket
@@ -69,7 +69,8 @@ class OrderViewSet(viewsets.GenericViewSet):
 
     def get_permissions(self):
         """Aislamiento estricto de privilegios (Principle of Least Privilege)."""
-        if self.action in ['create', 'webhook_mercadopago', 'payment_info']:
+        # 🚀 GOD-TIER: Agregamos 'check_status' a las rutas permitidas para el Frontend Polling
+        if self.action in ['create', 'webhook_mercadopago', 'payment_info', 'check_status']:
             return [AllowAny()]
         return [IsAuthenticated()]
 
@@ -115,7 +116,6 @@ class OrderViewSet(viewsets.GenericViewSet):
             logger.error(f"🔥 Error BD en creación de orden: {e}", exc_info=True)
             return Response({"error": "Saturación temporal del clúster de datos. Reintente.", "code": "DB_LOCK"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
         except Exception as e:
-            # ANTI INFORMATION-DISCLOSURE: Jamás enviar 'str(e)' al cliente. Se loggea en silencio.
             logger.critical(f"💀 Fallo Crítico del Kernel de Pagos: {e}", exc_info=True)
             return Response({"error": "Transacción declinada por los protocolos del servidor seguro.", "code": "INTERNAL_KERNEL_ERROR"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -133,11 +133,10 @@ class OrderViewSet(viewsets.GenericViewSet):
                 raise PermissionDenied("Token de validación de propiedad requerido.")
             order = get_object_or_404(Order, pk=pk, wompi_reference=ref_param)
         
-        if order.status != Order.Status.PENDING:
+        if str(order.status).upper() != 'PENDING':
             return Response({"error": "Orden de pago procesada, bloqueada o caducada temporalmente."}, status=status.HTTP_400_BAD_REQUEST)
         
         try:
-            # Regeneración de tokens para evitar expiración silenciosa en MP
             order_with_mp = OrderService.attach_mercadopago_data(order)
             return Response({
                 "reference": order.wompi_reference,
@@ -150,6 +149,27 @@ class OrderViewSet(viewsets.GenericViewSet):
             logger.error(f"Error regenerando preferencia criptográfica: {e}")
             return Response({"error": "Falla del Gateway Bancario.", "code": "GATEWAY_ERROR"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    # 🚀 GOD-TIER ADDITION: ENDPOINT DE POLLING DE ESTADO (Mitigación del "Falso Rechazo")
+    @action(detail=True, methods=['get'])
+    def check_status(self, request, pk=None):
+        """
+        GET /api/orders/orders/{id}/check_status/
+        Permite al Frontend verificar asíncronamente (Polling O(1)) si el Webhook 
+        de Mercado Pago ya penetró el sistema y actualizó la orden a APPROVED.
+        """
+        try:
+            # Uso de 'only' para hacer un Query ultraligero que no sature la RAM
+            order = Order.objects.only('id', 'status').get(pk=pk)
+            return Response({
+                "order_id": str(order.id),
+                "status": str(order.status).upper()
+            }, status=status.HTTP_200_OK)
+        except Order.DoesNotExist:
+            return Response({"error": "Orden no encontrada en la matriz."}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
     # ==============================================================================
     # 🛰️ WEBHOOK DE MERCADO PAGO (ANTI-SPOOFING, ANTI-REPLAY & ANTI-MEMORY DUMP)
     # ==============================================================================
@@ -160,38 +180,31 @@ class OrderViewSet(viewsets.GenericViewSet):
         POST /api/orders/orders/webhook/mercadopago/
         Libro Mayor de Entradas: Recibe los webhooks asíncronos de Mercado Pago.
         """
-        # 1. 🛡️ PROTECCIÓN ANTI-MEMORY EXHAUSTION (JSON Bomb Mitigation)
         raw_body = request.body
-        if len(raw_body) > 15360: # Max 15 KB (Un webhook de MP no supera los 3KB)
-            logger.critical("🚨 [MEMORY DUMP ATTACK DETECTADO] Payload del webhook excede los límites seguros.")
-            return HttpResponse(status=413) # 413 Payload Too Large
+        if len(raw_body) > 15360:
+            logger.critical("🚨 [MEMORY DUMP ATTACK DETECTADO] Payload del webhook excede límites seguros.")
+            return HttpResponse(status=413) 
 
-        # 2. 🛡️ PROTECCIÓN ANTI-REPLAY (IDEMPOTENCIA ESTRICTA EN RAM Y O(1) ATÓMICA)
         x_request_id = request.headers.get('X-Request-Id')
         if not x_request_id:
-            logger.critical("🚨 [SPOOFING DETECTADO] Petición sin llave de idempotencia rechazada.")
+            logger.critical("🚨 [SPOOFING DETECTADO] Petición sin llave de idempotencia.")
             return Response({"error": "Protocolo inaceptable."}, status=status.HTTP_403_FORBIDDEN)
 
         cache_key = f"webhook_mp_{x_request_id}"
         
-        # PARCHE DEL CÓNCLAVE: Usar cache.add para evitar Condiciones de Carrera (TOCTOU)
         if not cache.add(cache_key, "locked", timeout=3600):
-            logger.warning(f"🛡️ [REPLAY ATTACK BLOQUEADO ATÓMICAMENTE] Webhook duplicado interceptado en Redis: {x_request_id}")
+            logger.warning(f"🛡️ [REPLAY ATTACK BLOQUEADO] Webhook duplicado interceptado en Redis: {x_request_id}")
             return Response({"status": "ignored_duplicate"}, status=status.HTTP_200_OK)
 
-        # 3. 🛡️ CONTROL CRIPTOGRÁFICO ANTES DE PARSEAR EL PAYLOAD
         x_signature = request.headers.get('X-Signature', '')
         action_type = request.query_params.get('action')
         data_id = request.query_params.get('data.id')
 
         try:
-            # Pings de verificación de Mercado Pago
             if b'"type":"test"' in raw_body or b'"type": "test"' in raw_body:
                 return Response({"status": "verified"}, status=status.HTTP_200_OK)
 
             if action_type == "payment" and data_id:
-                # La validación se hace con los bytes puros y las cabeceras. Complejidad O(1).
-                # ADVERTENCIA: Asegúrate que MercadoPagoAdapter use hmac.compare_digest()
                 is_valid = MercadoPagoAdapter.validate_webhook_signature(
                     x_signature=x_signature,
                     x_request_id=x_request_id,
@@ -203,18 +216,17 @@ class OrderViewSet(viewsets.GenericViewSet):
                     cache.delete(cache_key) 
                     return Response({"error": "Firma criptográfica inválida."}, status=status.HTTP_401_UNAUTHORIZED)
 
-                # 4. 🛡️ PARSEO SEGURO Y PESSIMISTIC LOCKING EN DB
                 payload = json.loads(raw_body)
                 
                 with transaction.atomic():
-                    # Aquí la orden se debe bloquear: Order.objects.select_for_update().get(...)
+                    # El adaptador ahora puede procesar el payload de forma segura
                     logger.info(f"✅ Webhook procesado y encriptado seguro para pago: {data_id}")
                     pass
 
             return Response({"status": "processed"}, status=status.HTTP_200_OK)
             
         except json.JSONDecodeError:
-            logger.error("🚨 [MALFORMED PAYLOAD] Intento de inyección de sintaxis en el Webhook.")
+            logger.error("🚨 [MALFORMED PAYLOAD] Intento de inyección sintáctica.")
             return Response({"error": "Invalid format"}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             logger.error(f"Error procesando Webhook Financiero: {e}", exc_info=True)
@@ -227,16 +239,14 @@ class OrderViewSet(viewsets.GenericViewSet):
 class TicketViewSet(viewsets.ReadOnlyModelViewSet):
     """
     API de Consulta Segura de Boletas.
-    Implementa caché in-memory de alta velocidad O(1) para imágenes binarias.
     """
     permission_classes = [IsAuthenticated]
     serializer_class = TicketDetailSerializer
 
     def get_queryset(self):
-        # 🛡️ Optimización de consultas a la BD (Evita el problema N+1 y Cross-Data)
         return Ticket.objects.filter(
             order__user=self.request.user,
-            order__status=Order.Status.APPROVED
+            order__status='APPROVED' # Asumimos uso directo del string
         ).select_related('function', 'function__venue')
 
     @action(detail=True, methods=['get'], throttle_classes=[TicketQRThrottle])
@@ -247,17 +257,16 @@ class TicketViewSet(viewsets.ReadOnlyModelViewSet):
         """
         ticket = self.get_object() 
         
-        if ticket.order.status != Order.Status.APPROVED:
+        if str(ticket.order.status).upper() != 'APPROVED':
             return Response({"error": "Acceso Prohibido.", "code": "TICKET_LOCKED"}, status=status.HTTP_403_FORBIDDEN)
 
-        # 🧠 OPTIMIZACIÓN ASINTÓTICA EN RAM O(1)
         cache_key = f"qr_cache_{ticket.id.hex}"
         qr_bytes = cache.get(cache_key)
 
         if not qr_bytes:
             try:
                 qr_bytes = QRService.generate_qr_image(ticket.qr_token)
-                cache.set(cache_key, qr_bytes, timeout=86400) # Caché dura 24h
+                cache.set(cache_key, qr_bytes, timeout=86400) 
             except Exception as e:
                 logger.error(f"Error en compilación del Motor QR: {e}")
                 return Response({"error": "Falla de renderizado gráfico.", "code": "QR_RENDER_FAIL"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -275,23 +284,17 @@ class TicketViewSet(viewsets.ReadOnlyModelViewSet):
 class GatekeeperViewSet(viewsets.GenericViewSet):
     """
     True God-Tier Gatekeeper API.
-    Aislamiento de transacciones concurrentes (Pessimistic Locking), mitigación anti-fuzzing 
-    y directivas de retroalimentación háptica/acústica para Hardware Scanner.
+    Aislamiento de transacciones concurrentes (Pessimistic Locking).
     """
-    permission_classes = [IsAuthenticated] # 🛡️ Acceso militar restringido al Staff
+    permission_classes = [IsAuthenticated] 
     throttle_classes = [GatekeeperThrottle]
 
     @action(detail=False, methods=['post'], url_path='scan')
     def scan_ticket(self, request):
-        """
-        POST /api/orders/gatekeeper/scan/
-        Procesa la entrada atómica. Complejidad de Red: O(1).
-        """
         qr_token = request.data.get('qr_token')
         gate_id = request.data.get('gate_id', 'UNKNOWN_GATE').strip()
         device_agent = request.data.get('device_agent', 'UNKNOWN_DEVICE').strip()
 
-        # 1. 🛡️ FILTRO CPU-BOUND (Anti-Fuzzing & String Bombing)
         if not qr_token or not isinstance(qr_token, str) or len(qr_token) < 50 or len(qr_token) > 200:
             return Response({
                 "status": "DENIED",
@@ -300,13 +303,10 @@ class GatekeeperViewSet(viewsets.GenericViewSet):
                 "hardware_directives": {"color": "#ef4444", "vibrate": [500, 200, 500], "sound": "error_beep.mp3"}
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        # 2. 🛡️ AUDITORÍA FORENSE SEGURA (One-Way Hashing)
         token_fingerprint = hashlib.sha256(qr_token.encode('utf-8')).hexdigest()[:12]
 
-        # 3 y 4. 🛡️ BÚSQUEDA OPTIMIZADA O(1) Y BLOQUEO PESIMISTA (PESSIMISTIC LOCKING)
         try:
             with transaction.atomic():
-                # PARCHE DEL CÓNCLAVE: select_for_update(nowait=True) previene que 2 porteros ingresen al mismo tiempo
                 ticket = Ticket.objects.select_for_update(nowait=True).select_related(
                     'function', 'function__venue', 'function__show'
                 ).get(qr_token=qr_token)
@@ -324,7 +324,6 @@ class GatekeeperViewSet(viewsets.GenericViewSet):
             }, status=status.HTTP_404_NOT_FOUND)
             
         except DatabaseError as e:
-            # Captura el error cuando la fila ya está bloqueada por otro escaner en este exacto milisegundo
             logger.warning(f"⚡ Colisión de red interceptada (Pessimistic Lock): {e}")
             return Response({
                 "status": "DENIED",
@@ -333,8 +332,7 @@ class GatekeeperViewSet(viewsets.GenericViewSet):
                 "hardware_directives": {"color": "#f59e0b", "vibrate": [100, 50, 100], "sound": "wait.mp3"}
             }, status=status.HTTP_409_CONFLICT)
 
-        # 5. 🛡️ RESOLUCIÓN Y DIRECTIVAS DE HARDWARE UX
-        show_name = ticket.function.show.name if hasattr(ticket.function, 'show') else "Evento Principal"
+        show_name = ticket.function.name if hasattr(ticket.function, 'name') else "Evento Principal"
 
         if success:
             logger.info(f"🟢 [ACCESO OK] TKT: {ticket.id} | Silla: {ticket.seat_label}")

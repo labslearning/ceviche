@@ -27,8 +27,8 @@ logger = logging.getLogger(__name__)
 class OrderService:
     """
     🚀 SERVICIO PRINCIPAL: Gestor Transaccional Financiero (God-Tier / Nivel Bancario).
-    Equipado con Lazy Garbage Collection (Auto-Healing), Hash Maps O(1), y mitigación 
-    de ataques Race Conditions (Double-Spending) y DDoS.
+    Equipado con Lazy Garbage Collection atómico, Hash Maps O(1), Pessimistic Locking
+    y mitigación avanzada de ataques Race Conditions (Double-Spending) y DDoS.
     """
 
     @staticmethod
@@ -68,7 +68,8 @@ class OrderService:
     def create_hybrid_order(user, validated_data: dict) -> Order:
         """
         Crea una orden atómica. 
-        Inyecta protocolos de auto-liberación de inventario (Lazy GC) en tiempo real.
+        Inyecta protocolos de auto-liberación de inventario (Lazy GC) y Bloqueo Pesimista
+        en tiempo real para erradicar el Double-Spending.
         """
         function_id = validated_data.get('function_id')
         seat_labels = validated_data.get('seat_labels', [])
@@ -80,11 +81,13 @@ class OrderService:
             raise ValidationError("Límite bancario: Máximo 20 tickets por transacción.")
 
         with transaction.atomic():
-            # 1. Validación Topológica
+            # 1. 🛡️ PESSIMISTIC LOCKING (El cerrojo God-Tier)
+            # select_for_update() pone en "Fila India" a todos los usuarios que intentan
+            # acceder a esta función exacta al mismo milisegundo, erradicando el IntegrityError.
             function_instance = None
             if function_id:
                 try:
-                    function_instance = ShowFunction.objects.get(pk=function_id)
+                    function_instance = ShowFunction.objects.select_for_update().get(pk=function_id)
                 except ShowFunction.DoesNotExist:
                     raise ValidationError("Violación de Integridad: El nodo del evento no existe.")
             elif seat_labels:
@@ -98,23 +101,22 @@ class OrderService:
             
             if seat_labels and function_instance:
                 
-                # 🚀 GOD-TIER LAZY GARBAGE COLLECTOR (Libera sillas pegadas)
-                # Escanea si las sillas que el usuario quiere están atrapadas en órdenes abandonadas (> 15 mins)
+                # 🚀 GOD-TIER LAZY GARBAGE COLLECTOR (Destrucción atómica de bloqueos fantasmas)
                 expiration_limit = timezone.now() - datetime.timedelta(minutes=15)
                 
-                ghost_tickets = Ticket.objects.filter(
-                    function=function_instance,
-                    seat_label__in=seat_labels,
-                    order__status=Order.Status.PENDING, 
-                    order__created_at__lt=expiration_limit
-                ).select_related('order')
+                # Búsqueda de órdenes zombi que atrapen las sillas que el usuario actual desea
+                ghost_orders = Order.objects.filter(
+                    status=Order.Status.PENDING, 
+                    created_at__lt=expiration_limit,
+                    tickets__function=function_instance,
+                    tickets__seat_label__in=seat_labels
+                ).values_list('id', flat=True)
 
-                if ghost_tickets.exists():
-                    # 💥 Extracción masiva O(1) y destrucción atómica de bloqueos fantasmas
-                    ghost_order_ids = list(set(ghost_tickets.values_list('order_id', flat=True)))
-                    Ticket.objects.filter(order_id__in=ghost_order_ids).update(state=Ticket.State.VOIDED)
-                    Order.objects.filter(id__in=ghost_order_ids).update(status=Order.Status.REJECTED)
-                    logger.info(f"🧹 [AUTO-HEALING] Sillas zombi liberadas de la matriz: {seat_labels}")
+                if ghost_orders:
+                    # 💥 Ejecución Subquery Atómica O(1): Destruye la orden sin iterar en Python RAM
+                    Ticket.objects.filter(order_id__in=ghost_orders).update(state=Ticket.State.VOIDED)
+                    Order.objects.filter(id__in=ghost_orders).update(status=Order.Status.REJECTED)
+                    logger.info(f"🧹 [AUTO-HEALING] Bóvedas Zombi {list(ghost_orders)} destruidas. Sillas {seat_labels} liberadas.")
 
                 # A. Generación del Hash Map Comercial en RAM (O(1))
                 available_types = {str(tt.zone_code).strip().lower(): tt for tt in TicketType.objects.filter(function=function_instance)}
@@ -134,7 +136,7 @@ class OrderService:
 
                 # D. Ensamblaje en Memoria Aislada
                 for label in seat_labels:
-                    clean_label = str(label).strip()
+                    clean_label = str(label).strip()[:50] # Anti-String Bombing Payload
                     raw_zone_code = seat_zone_map.get(clean_label)
                     
                     ticket_type = None
@@ -213,15 +215,17 @@ class OrderService:
                 status=Order.Status.PENDING 
             )
 
-            # 🛡️ BULK CREATE CON CONTROL DE CONDICIÓN DE CARRERA (Optimistic Locking)
+            # 🛡️ BULK CREATE SEGURO
             if seats_to_buy:
                 for t in seats_to_buy: 
                     t.order = order
                 try:
                     Ticket.objects.bulk_create(seats_to_buy, ignore_conflicts=False)
                 except IntegrityError as e:
+                    # Este bloque ahora es un fallback remoto. El select_for_update anula casi a cero
+                    # la probabilidad de llegar a este punto.
                     logger.warning(f"🚨 [SNIPER ATTACK MITIGADO] Condición de carrera frenada en Postgres.")
-                    raise ValidationError("Colisión de red: Otro usuario acaba de comprar esta silla milisegundos antes. Actualiza tu mapa.")
+                    raise ValidationError("Colisión de red: Otro usuario acaba de asegurar esta silla milisegundos antes. Actualiza tu mapa.")
             
             if products_to_buy:
                 for p in products_to_buy: 
