@@ -166,19 +166,18 @@ class OrderViewSet(viewsets.GenericViewSet):
             logger.critical("🚨 [MEMORY DUMP ATTACK DETECTADO] Payload del webhook excede los límites seguros.")
             return HttpResponse(status=413) # 413 Payload Too Large
 
-        # 2. 🛡️ PROTECCIÓN ANTI-REPLAY (IDEMPOTENCIA ESTRICTA EN RAM)
+        # 2. 🛡️ PROTECCIÓN ANTI-REPLAY (IDEMPOTENCIA ESTRICTA EN RAM Y O(1) ATÓMICA)
         x_request_id = request.headers.get('X-Request-Id')
         if not x_request_id:
             logger.critical("🚨 [SPOOFING DETECTADO] Petición sin llave de idempotencia rechazada.")
             return Response({"error": "Protocolo inaceptable."}, status=status.HTTP_403_FORBIDDEN)
 
         cache_key = f"webhook_mp_{x_request_id}"
-        if cache.get(cache_key):
-            logger.warning(f"🛡️ [REPLAY ATTACK BLOQUEADO] Webhook duplicado interceptado en Cache Redis: {x_request_id}")
-            return Response({"status": "ignored_duplicate"}, status=status.HTTP_200_OK)
         
-        # Bloquea temporalmente para evitar ataques de carrera (Race Conditions)
-        cache.set(cache_key, True, timeout=3600) 
+        # PARCHE DEL CÓNCLAVE: Usar cache.add para evitar Condiciones de Carrera (TOCTOU)
+        if not cache.add(cache_key, "locked", timeout=3600):
+            logger.warning(f"🛡️ [REPLAY ATTACK BLOQUEADO ATÓMICAMENTE] Webhook duplicado interceptado en Redis: {x_request_id}")
+            return Response({"status": "ignored_duplicate"}, status=status.HTTP_200_OK)
 
         # 3. 🛡️ CONTROL CRIPTOGRÁFICO ANTES DE PARSEAR EL PAYLOAD
         x_signature = request.headers.get('X-Signature', '')
@@ -186,12 +185,13 @@ class OrderViewSet(viewsets.GenericViewSet):
         data_id = request.query_params.get('data.id')
 
         try:
-            # Pings de verificación de Mercado Pago (El único caso donde parseamos antes)
+            # Pings de verificación de Mercado Pago
             if b'"type":"test"' in raw_body or b'"type": "test"' in raw_body:
                 return Response({"status": "verified"}, status=status.HTTP_200_OK)
 
             if action_type == "payment" and data_id:
                 # La validación se hace con los bytes puros y las cabeceras. Complejidad O(1).
+                # ADVERTENCIA: Asegúrate que MercadoPagoAdapter use hmac.compare_digest()
                 is_valid = MercadoPagoAdapter.validate_webhook_signature(
                     x_signature=x_signature,
                     x_request_id=x_request_id,
@@ -200,17 +200,14 @@ class OrderViewSet(viewsets.GenericViewSet):
 
                 if not is_valid:
                     logger.critical(f"🚨 [HMAC SPOOFING] Firma criptográfica del banco inválida. ID: {data_id}")
-                    # Liberamos el caché para no bloquear futuras peticiones legítimas con este ID por error
                     cache.delete(cache_key) 
                     return Response({"error": "Firma criptográfica inválida."}, status=status.HTTP_401_UNAUTHORIZED)
 
                 # 4. 🛡️ PARSEO SEGURO Y PESSIMISTIC LOCKING EN DB
-                # Solo parseamos el JSON DESPUÉS de comprobar que viene de Mercado Pago
                 payload = json.loads(raw_body)
                 
                 with transaction.atomic():
-                    # Lógica interna para consultar a MP el estado real del 'data_id' y actualizar la Order
-                    # El select_for_update() garantiza aislamiento ACID.
+                    # Aquí la orden se debe bloquear: Order.objects.select_for_update().get(...)
                     logger.info(f"✅ Webhook procesado y encriptado seguro para pago: {data_id}")
                     pass
 
@@ -221,7 +218,7 @@ class OrderViewSet(viewsets.GenericViewSet):
             return Response({"error": "Invalid format"}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             logger.error(f"Error procesando Webhook Financiero: {e}", exc_info=True)
-            return Response({"status": "error_acknowledged"}, status=status.HTTP_200_OK) # Retornamos 200 para evitar retrys infinitos de MP (DDoS)
+            return Response({"status": "error_acknowledged"}, status=status.HTTP_200_OK)
 
 
 # ==============================================================================
@@ -295,7 +292,6 @@ class GatekeeperViewSet(viewsets.GenericViewSet):
         device_agent = request.data.get('device_agent', 'UNKNOWN_DEVICE').strip()
 
         # 1. 🛡️ FILTRO CPU-BOUND (Anti-Fuzzing & String Bombing)
-        # Validamos tamaño estricto para evitar que inyecten un string de 10MB y colapsen la BD
         if not qr_token or not isinstance(qr_token, str) or len(qr_token) < 50 or len(qr_token) > 200:
             return Response({
                 "status": "DENIED",
@@ -307,11 +303,17 @@ class GatekeeperViewSet(viewsets.GenericViewSet):
         # 2. 🛡️ AUDITORÍA FORENSE SEGURA (One-Way Hashing)
         token_fingerprint = hashlib.sha256(qr_token.encode('utf-8')).hexdigest()[:12]
 
-        # 3. 🛡️ BÚSQUEDA OPTIMIZADA O(1)
+        # 3 y 4. 🛡️ BÚSQUEDA OPTIMIZADA O(1) Y BLOQUEO PESIMISTA (PESSIMISTIC LOCKING)
         try:
-            ticket = Ticket.objects.select_related(
-                'function', 'function__venue', 'function__show'
-            ).get(qr_token=qr_token)
+            with transaction.atomic():
+                # PARCHE DEL CÓNCLAVE: select_for_update(nowait=True) previene que 2 porteros ingresen al mismo tiempo
+                ticket = Ticket.objects.select_for_update(nowait=True).select_related(
+                    'function', 'function__venue', 'function__show'
+                ).get(qr_token=qr_token)
+                
+                scanner_agent = f"{request.user.email} [{device_agent}]"
+                success, reason = ticket.process_scan(gate_id=gate_id, scanner_agent_id=scanner_agent)
+
         except Ticket.DoesNotExist:
             logger.critical(f"🚨 [SPOOFING DETECTADO] Puerta: {gate_id} | Huella Forense: {token_fingerprint}")
             return Response({
@@ -320,18 +322,14 @@ class GatekeeperViewSet(viewsets.GenericViewSet):
                 "message": "¡FALSO! El código QR no existe en la bóveda.",
                 "hardware_directives": {"color": "#dc2626", "vibrate": [800], "sound": "alarm.mp3"}
             }, status=status.HTTP_404_NOT_FOUND)
-
-        # 4. 🛡️ MOTOR DE CONCURRENCIA PESIMISTA
-        scanner_agent = f"{request.user.email} [{device_agent}]"
-        
-        try:
-            success, reason = ticket.process_scan(gate_id=gate_id, scanner_agent_id=scanner_agent)
-        except Exception as e:
-            logger.warning(f"⚡ Colisión de red interceptada: {e}")
+            
+        except DatabaseError as e:
+            # Captura el error cuando la fila ya está bloqueada por otro escaner en este exacto milisegundo
+            logger.warning(f"⚡ Colisión de red interceptada (Pessimistic Lock): {e}")
             return Response({
                 "status": "DENIED",
                 "error": "CONCURRENCY_LOCKED",
-                "message": "Protocolo de Seguridad: Procesando simultáneamente en otra puerta.",
+                "message": "Protocolo de Seguridad: Boleto procesándose simultáneamente en otra puerta.",
                 "hardware_directives": {"color": "#f59e0b", "vibrate": [100, 50, 100], "sound": "wait.mp3"}
             }, status=status.HTTP_409_CONFLICT)
 

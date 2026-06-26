@@ -7,7 +7,7 @@ from django.core.cache import cache
 from django.conf import settings
 from django.utils.html import strip_tags
 from django.utils import timezone
-from django.db import transaction
+from django.db import transaction, DatabaseError
 
 # Importaciones de Modelos y Servicios
 from apps.orders.models import Order, Ticket
@@ -16,71 +16,75 @@ from apps.orders.services import QRService
 logger = logging.getLogger(__name__)
 
 # ==============================================================================
-# 📨 TAREA 1: DESPACHO CRIPTOGRÁFICO DE CORREOS (IDEMPOTENTE)
+# 📨 TAREA 1: DESPACHO CRIPTOGRÁFICO DE CORREOS (ENTREGA ASÍNCRONA RESILIENTE)
 # ==============================================================================
 
 @shared_task(
     bind=True,
-    max_retries=5,
-    default_retry_delay=30, # Reducido a 30s para evitar cuellos de botella en la cola
+    # 🛡️ INFINITE RETRY + EXPONENTIAL BACKOFF: Si SMTP falla, reintenta infinitamente 
+    # espaciando el tiempo (30s, 1m, 2m, 4m, 8m...) para evitar DDos interno.
+    autoretry_for=(Exception,), 
+    retry_backoff=30, 
+    retry_backoff_max=3600,
+    max_retries=None, 
     queue='financial_deliveries'
 )
 def process_order_tickets_and_email(self, order_id: str):
     """
     WORKER TASK (Grado Fintech).
-    Equipado con Distributed Locking (Anti-Spam), Caching en Memoria O(1),
-    y liberación inmediata de descriptores de archivos (Memory Leak Prevention).
+    Desacoplamiento Absoluto: El fallo en la entrega jamás altera el estado financiero.
     """
     logger.info(f"⚙️ [WORKER RUNNING] Inicializando despacho para Orden ID: {order_id}")
     
-    # 🛡️ ESCUDO 1: Distributed Lock (Idempotencia Estricta)
-    # Evita que dos workers procesen la misma orden en paralelo por un fallo en la cola de mensajes
-    lock_key = f"lock_email_dispatch_{order_id}"
     sent_flag_key = f"flag_email_sent_{order_id}"
 
+    # 1. ESCUDO DE IDEMPOTENCIA (O(1) Redis Lock)
     if cache.get(sent_flag_key):
-        logger.info(f"✅ [IDEMPOTENCIA] El correo de la orden {order_id} ya fue despachado previamente. Abortando duplicado.")
+        logger.info(f"✅ [IDEMPOTENCIA] Tickets ya despachados para la orden {order_id}. Abortando duplicado.")
         return "ALREADY_SENT"
 
-    # Adquisición de bloqueo atómico en Redis (Tiempo de vida máximo: 2 minutos)
-    lock = cache.lock(lock_key, timeout=120) if hasattr(cache, 'lock') else None
-    lock_acquired = lock.acquire(blocking=False) if lock else cache.add(lock_key, "LOCKED", 120)
-    
-    if not lock_acquired:
-        logger.warning(f"⚠️ [RACE CONDITION] Otro worker ya está procesando la orden {order_id}. Reintentando...")
-        raise self.retry(exc=Exception("Colisión de workers. Lock activo."))
-
     try:
-        # 🚀 ANTI-N+1 SHIELD: Extracción profunda desde PostgreSQL
-        order = Order.objects.prefetch_related('tickets__function__venue').get(pk=order_id)
-        
-        status_str = str(order.status).upper()
-        if status_str != 'APPROVED':
-            logger.warning(f"⚠️ [WORKER ABORT] Intento de procesar orden no aprobada: {order_id}")
-            return "ABORTED_INVALID_STATUS"
+        # 2. BLOQUEO PESIMISTA: Protegemos la orden mientras preparamos los tickets
+        with transaction.atomic():
+            # 🚀 ANTI-N+1 SHIELD
+            order = Order.objects.select_for_update().prefetch_related(
+                'tickets__function__venue'
+            ).get(pk=order_id)
+            
+            if order.status != Order.Status.APPROVED:
+                logger.warning(f"⚠️ [WORKER ABORT] Orden {order_id} no está aprobada (Actual: {order.status}).")
+                return "ABORTED_INVALID_STATUS"
+
+            # 🛡️ MÁQUINA DE ESTADO DESACOPLADA (Dominio Logístico)
+            # Asegúrate de tener un campo `delivery_status` en tu modelo Order
+            if hasattr(order, 'delivery_status'):
+                if order.delivery_status == 'DELIVERED':
+                    return "ALREADY_DELIVERED_IN_DB"
+                order.delivery_status = 'PENDING_GENERATION'
+                order.save(update_fields=['delivery_status'])
 
         recipient_email = order.user.email if order.user else None
         if not recipient_email and order.payment_metadata:
              recipient_email = order.payment_metadata.get('payer', {}).get('email')
              
         if not recipient_email:
-            logger.critical(f"💀 [WORKER FATAL] Fuga de datos: No hay correo destino en la orden {order_id}")
+            # Si no hay correo, loggeamos como crítico, pero la orden SIGUE APROBADA.
+            logger.critical(f"💀 [DATA LEAK PREVENTED] No hay correo destino en la orden {order_id}")
             return "FAILED_NO_EMAIL"
 
         attachments = []
         tickets_data = []
 
-        # 🧠 O(1) MEMORY POOLING & CACHE EXTRACTION
+        # 3. 🧠 GENERACIÓN DE ACTIVOS DIGITALES (O(1) MEMORY POOLING)
         for ticket in order.tickets.all():
             cache_key_qr = f"qr_cache_{ticket.id.hex}"
             qr_bytes = cache.get(cache_key_qr)
 
             if not qr_bytes:
-                logger.info(f"💡 Cache Miss (Ticket {ticket.id.hex}). Recompilando matriz binaria.")
+                logger.info(f"💡 Cache Miss (Ticket {ticket.id.hex}). Compilando matriz binaria.")
                 qr_bytes = QRService.generate_qr_image(ticket.qr_token)
                 cache.set(cache_key_qr, qr_bytes, timeout=86400) # Persistencia de 24h
 
-            # Mapeo Seguro
             function_name = ticket.function.name if hasattr(ticket.function, 'name') else "Evento Especial"
             
             tickets_data.append({
@@ -97,7 +101,7 @@ def process_order_tickets_and_email(self, order_id: str):
                 "image/png"
             ))
 
-        # 📄 COMPILACIÓN DEL PAQUETE FINANCIERO
+        # 4. 📄 COMPILACIÓN DEL PAQUETE Y TÚNEL SMTP
         context = {
             'order_reference': order.wompi_reference or str(order.id)[:8].upper(),
             'total_amount': order.total_amount,
@@ -121,36 +125,37 @@ def process_order_tickets_and_email(self, order_id: str):
         for filename, content, mimetype in attachments:
             email.attach(filename, content, mimetype)
 
-        # 🛡️ DESPACHO ATÓMICO SMTP
+        # 🛡️ DESPACHO ATÓMICO SMTP (Bloqueante)
         email.send(fail_silently=False)
         
-        # 🛡️ ESCUDO 2: Sello de Idempotencia Inmutable (Persistencia 30 días)
+        # 5. ACTUALIZACIÓN DEL ESTADO LOGÍSTICO Y CIERRE
+        if hasattr(order, 'delivery_status'):
+            with transaction.atomic():
+                order_update = Order.objects.select_for_update().get(pk=order_id)
+                order_update.delivery_status = 'DELIVERED'
+                order_update.save(update_fields=['delivery_status'])
+
+        # Sello de Idempotencia Inmutable (Persistencia 30 días)
         cache.set(sent_flag_key, "DELIVERED", timeout=2592000) 
         
         logger.info(f"📨 [DESPACHO SUCCESS] Correo emitido a {recipient_email} (Ref: {context['order_reference']})")
         return f"SUCCESS_DELIVERED_TO_{recipient_email}"
 
     except Order.DoesNotExist:
-        logger.error(f"❌ Orden {order_id} no encontrada (Posible retraso en COMMIT DB). Reintentando...")
-        raise self.retry(exc=Order.DoesNotExist)
+        logger.error(f"❌ Orden {order_id} no encontrada (Fallo asincrónico DB).")
+        raise # Delega al retry
         
     except Exception as exc:
         logger.critical(f"🚨 Falla en túnel SMTP o compilación: {exc}")
-        raise self.retry(exc=exc)
+        # El decorador @shared_task interceptará esta excepción y aplicará el Exponential Backoff
+        raise
         
     finally:
-        # Liberación de Memoria Garantizada (Destrucción del Lock)
-        if lock and lock_acquired:
-            try:
-                lock.release()
-            except Exception:
-                pass
-        elif not lock:
-            cache.delete(lock_key)
-        
-        # Invocación manual al recolector de basura de Python para vaciar los binarios pesados de la RAM
-        del attachments
-        del tickets_data
+        # Prevención de Memory Dumping / CPU Exhaustion liberando binarios manualmente
+        if 'attachments' in locals():
+            del attachments
+        if 'tickets_data' in locals():
+            del tickets_data
 
 
 # ==============================================================================
@@ -160,37 +165,46 @@ def process_order_tickets_and_email(self, order_id: str):
 @shared_task(name="orders.purge_orphaned_reservations")
 def purge_orphaned_reservations():
     """
-    🛡️ SWEEPER DE NIVEL BANCARIO (O(1) Network Operations)
-    Escanea la base de datos en busca de transacciones iniciadas que fueron abandonadas 
-    en la pasarela de pagos. Restaura el inventario a nivel global silenciosamente.
-    Ejecutar con Celery Beat cada 10 minutos.
+    🛡️ SWEEPER DE NIVEL BANCARIO (Anti-Deadlock Mechanism)
+    Libera inventario sin colisionar con los Webhooks entrantes.
     """
     logger.info("📡 [SWEEPER INICIADO] Escaneando anomalías en la bóveda de inventario...")
     
-    # Tolerancia de 15 minutos (Regla de caducidad estricta)
     expiration_time = timezone.now() - datetime.timedelta(minutes=15)
 
-    # Identificación de clústeres zombis
-    expired_orders = Order.objects.filter(
-        status='PENDING', 
-        created_at__lt=expiration_time
-    )
+    try:
+        with transaction.atomic():
+            # 🛡️ GOD-TIER FIX: select_for_update(skip_locked=True)
+            # CRÍTICO: Si el webhook de MP está actualizando una orden en este exacto milisegundo, 
+            # el Sweeper la ignorará (skip_locked) en lugar de causar un bloqueo (Deadlock).
+            expired_orders = Order.objects.select_for_update(skip_locked=True).filter(
+                status=Order.Status.PENDING, 
+                created_at__lt=expiration_time
+            )
 
-    if not expired_orders.exists():
-        logger.info("✅ [SWEEPER] Clúster limpio. No se encontraron bloqueos huérfanos.")
-        return "CLEAN_CLUSTER"
+            # Para evitar cargar todo en memoria, extraemos solo los IDs a purgar
+            expired_order_ids = list(expired_orders.values_list('id', flat=True))
 
-    with transaction.atomic():
-        # 💥 DESTRUCCIÓN ATÓMICA (Cero iteraciones en RAM, todo procesado en el motor de BD)
-        tickets_released = Ticket.objects.filter(
-            order__in=expired_orders
-        ).update(state='VOIDED') 
+            if not expired_order_ids:
+                logger.info("✅ [SWEEPER] Clúster limpio. No se encontraron bloqueos huérfanos accesibles.")
+                return "CLEAN_CLUSTER"
 
-        orders_cancelled = expired_orders.update(status='REJECTED')
+            # 💥 DESTRUCCIÓN ATÓMICA Y SILENCIOSA
+            tickets_released = Ticket.objects.filter(
+                order_id__in=expired_order_ids
+            ).update(state='VOIDED') 
 
-    logger.info(
-        f"🔥 [SWEEPER EJECUTADO] Matriz purgada exitosamente. "
-        f"Sillas liberadas: {tickets_released} | Bóvedas destruidas: {orders_cancelled}"
-    )
-    
-    return f"Purged {orders_cancelled} orders and freed {tickets_released} seats."
+            orders_cancelled = Order.objects.filter(
+                id__in=expired_order_ids
+            ).update(status=Order.Status.REJECTED)
+
+        logger.info(
+            f"🔥 [SWEEPER EJECUTADO] Matriz purgada exitosamente. "
+            f"Sillas liberadas: {tickets_released} | Bóvedas destruidas: {orders_cancelled}"
+        )
+        
+        return f"Purged {orders_cancelled} orders and freed {tickets_released} seats."
+
+    except DatabaseError as e:
+        logger.error(f"⚠️ [SWEEPER ALERT] Falla transaccional limpiando bóvedas: {e}")
+        return "SWEEPER_ERROR_DB_LOCK"
