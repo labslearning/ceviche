@@ -16,16 +16,18 @@
 </head>
 <body>
 
+<script>console.log("Estado de Bóveda Sincronizado: {{ status_str }}");</script>
+
 <div class="container">
     <div class="row">
         <div class="col-md-8 col-md-offset-2">
             
             <div class="status-box" id="main-container">
-                <!-- 🛡️ ESTADO: APROBADO (Estado Final) -->
-                {% if order.status == 'APPROVED' %}
+                
+                {% if status_str == 'APPROVED' %}
                     <i class="fas fa-check-circle text-success fa-4x mb-3"></i>
                     <h2 class="text-success">¡Transacción Aprobada!</h2>
-                    <p class="lead">Tus Smart Tickets han sido generados con éxito.</p>
+                    <p class="lead">Tus Smart Tickets han sido generados.</p>
                     <hr>
                     <div class="text-left">
                         {% for ticket in tickets %}
@@ -36,46 +38,37 @@
                         {% endfor %}
                     </div>
 
-                <!-- 🟡 ESTADO: PENDIENTE (Estado Transitorio - POLLED) -->
-                {% elif order.status == 'PENDING' %}
+                {% elif status_str == 'PENDING' %}
                     <i class="fas fa-spinner spinner fa-4x mb-3"></i>
                     <h2 class="text-warning">Validando con el Banco...</h2>
-                    <p>Estamos confirmando el pago. No cierres esta ventana.</p>
-                    <div id="countdown" class="text-muted small"></div>
+                    <p>Estamos esperando confirmación. No recargues.</p>
 
                     <script>
-                        let attempts = 0;
-                        const maxAttempts = 20; // 60 segundos de polling máximo
+                        // Escáner de estado asíncrono
                         const poll = setInterval(async () => {
-                            attempts++;
                             try {
                                 const response = await fetch('/api/v1/orders/{{ order.id }}/check_status/');
                                 const data = await response.json();
-                                if (data.status === 'APPROVED') {
+                                // Solo recargamos si el estado cambió a algo terminal
+                                if (data.status !== 'PENDING') {
                                     clearInterval(poll);
                                     window.location.reload(); 
-                                } else if (data.status === 'REJECTED' || attempts >= maxAttempts) {
-                                    clearInterval(poll);
-                                    // Si después de 60s sigue pendiente, forzamos recarga para ver error o estado final
-                                    window.location.reload();
                                 }
                             } catch (e) { console.error("Polling error:", e); }
                         }, 3000);
                     </script>
 
-                <!-- 🔴 ESTADO: RECHAZADO (Estado Final) -->
-                {% elif order.status == 'REJECTED' or order.status == 'VOIDED' %}
+                {% elif status_str == 'REJECTED' or status_str == 'VOIDED' %}
                     <i class="fas fa-times-circle text-danger fa-4x mb-3"></i>
                     <h2 class="text-danger">Pago Rechazado</h2>
-                    <p>La entidad financiera ha declinado la transacción.</p>
-                    <a href="/eventos/" class="btn btn-primary">Intentar con otro método</a>
+                    <p>La transacción no fue completada.</p>
+                    <a href="/eventos/" class="btn btn-primary">Intentar nuevamente</a>
                 
-                <!-- 🛡️ ESTADO: SEGURIDAD (Estado de recuperación) -->
                 {% else %}
                     <i class="fas fa-sync spinner text-info fa-4x mb-3"></i>
-                    <h2>Sincronizando...</h2>
-                    <p>Recuperando estado de la transacción: {{ order.status }}</p>
-                    <script>setTimeout(() => window.location.reload(), 2000);</script>
+                    <h2>Sincronizando Estado...</h2>
+                    <p>El nodo financiero está respondiendo. Recargando...</p>
+                    <script>setTimeout(() => window.location.reload(), 3000);</script>
                 {% endif %}
             </div>
 
