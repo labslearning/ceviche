@@ -11,7 +11,8 @@ from apps.website.views import (
     HomeView, 
     events_list, 
     event_detail_view,
-    CartView
+    CartView,
+    MisTicketsView # 🚀 1. IMPORTAMOS LA NUEVA VISTA
 )
 
 from apps.events.api.views import ShowFunctionViewSet, VenueViewSet, VenueLayoutView 
@@ -60,8 +61,12 @@ urlpatterns = [
     # 2. Detalle del evento (Selección de sillas)
     path('eventos/<uuid:event_id>/', event_detail_view, name='event_detail'),
     
-    # ✅ ESTA ES LA RUTA QUE FALTABA (Soluciona el error NoReverseMatch)
+    # 3. Carrito de Compras
     path('cart/', CartView.as_view(), name='cart_view'),
+
+    # 🚀 4. LA BÓVEDA DEL USUARIO (Soluciona el 404 de Mercado Pago)
+    path('mis-tickets/', MisTicketsView.as_view(), name='mis_tickets'),
+    path('mis-tickets', MisTicketsView.as_view()), # Comodín Anti-Slash
     
     # -----------------------------------------------------------
     # 📂 TUS RUTAS ESTÁTICAS ORIGINALES (No hemos borrado nada)
@@ -69,7 +74,7 @@ urlpatterns = [
     path('index.html', HomeView.as_view(), name='index_html'),
     path('boleteria-1.html', TemplateView.as_view(template_name="boleteria-1.html"), name='boleteria'),
     path('contact.html', TemplateView.as_view(template_name="contact.html"), name='contact'),
-    path('cart.html', TemplateView.as_view(template_name="cart.html"), name='cart'), # Tu ruta antigua (se mantiene)
+    path('cart.html', TemplateView.as_view(template_name="cart.html"), name='cart'), 
     path('trabaja-con-nosotros.html', TemplateView.as_view(template_name="trabaja-con-nosotros.html"), name='trabajo'),
     path('vuelos-dron.html', TemplateView.as_view(template_name="vuelos-dron.html"), name='vuelos_dron'),
     path('merch-2.html', TemplateView.as_view(template_name="merch-2.html"), name='merch'),
