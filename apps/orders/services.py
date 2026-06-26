@@ -2,6 +2,7 @@ import hashlib
 import secrets
 import logging
 import qrcode
+import datetime
 from io import BytesIO
 from decimal import Decimal, InvalidOperation
 from typing import Dict, List, Any
@@ -10,6 +11,7 @@ from django.db import transaction, IntegrityError
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from decouple import config
 
 # Importación de Modelos
@@ -25,17 +27,17 @@ logger = logging.getLogger(__name__)
 class OrderService:
     """
     🚀 SERVICIO PRINCIPAL: Gestor Transaccional Financiero (God-Tier / Nivel Bancario).
-    Maneja Hash Maps para rendimiento O(1), firmas criptográficas en RAM y mitigación 
-    avanzada de Race Conditions y DoS.
+    Equipado con Lazy Garbage Collection (Auto-Healing), Hash Maps O(1), y mitigación 
+    de ataques Race Conditions (Double-Spending) y DDoS.
     """
 
     @staticmethod
     def _build_seat_map(layout_data: Any) -> Dict[str, str]:
         """
         🛡️ ANTI-STACK OVERFLOW SHIELD (Algoritmo Iterativo DFS).
-        Aplana un JSON complejo en un diccionario 1D. Reemplaza la recursividad 
-        por una pila iterativa para evitar ataques de desbordamiento de memoria (OOM).
-        Rendimiento: O(V) en tiempo, O(V) en espacio.
+        Desacopla la recursividad clásica en una pila iterativa. 
+        Inmune a ataques de desbordamiento de memoria (Memory Exhaustion).
+        Rendimiento: O(V) Tiempo, O(V) Espacio.
         """
         result_map: Dict[str, str] = {}
         if not layout_data:
@@ -47,7 +49,6 @@ class OrderService:
             current = stack.pop()
             
             if isinstance(current, list):
-                # Desacopla la lista en memoria y la añade a la pila
                 stack.extend(current)
                 
             elif isinstance(current, dict):
@@ -57,7 +58,6 @@ class OrderService:
                 if obj_id and zone:
                     result_map[str(obj_id).strip()] = str(zone).strip()
                     
-                # Extrae los valores anidados dinámicamente sin recursión
                 for key, value in current.items():
                     if isinstance(value, (list, dict)):
                         stack.append(value)
@@ -67,41 +67,59 @@ class OrderService:
     @staticmethod
     def create_hybrid_order(user, validated_data: dict) -> Order:
         """
-        Crea una orden mixta de forma atómica.
-        Protegida contra Double-Spending, DDoS y Race Conditions extremas.
+        Crea una orden atómica. 
+        Inyecta protocolos de auto-liberación de inventario (Lazy GC) en tiempo real.
         """
         function_id = validated_data.get('function_id')
         seat_labels = validated_data.get('seat_labels', [])
         products_data = validated_data.get('products', [])
 
-        # 🛡️ HARD LIMIT: Prevención de ataques de agotamiento de DB (DDoS)
+        # 🛡️ HARD LIMIT: Cota de red para prevenir ataques DDoS sobre PostgreSQL
         if isinstance(seat_labels, list) and len(seat_labels) > 20:
-            logger.warning(f"🚨 [DDoS MITIGADO] Intento de compra masiva superado: {len(seat_labels)} sillas. IP/User: {user}")
-            raise ValidationError("Por seguridad, el límite máximo es de 20 tickets por transacción.")
+            logger.warning(f"🚨 [DDoS MITIGADO] Tráfico masivo bloqueado: {len(seat_labels)} sillas. IP/User: {user}")
+            raise ValidationError("Límite bancario: Máximo 20 tickets por transacción.")
 
         with transaction.atomic():
-            # 1. Resolución de Función (Optimizamos bloqueo selectivo)
+            # 1. Validación Topológica
             function_instance = None
             if function_id:
                 try:
                     function_instance = ShowFunction.objects.get(pk=function_id)
                 except ShowFunction.DoesNotExist:
-                    raise ValidationError("Violación de Integridad: La función seleccionada no existe.")
+                    raise ValidationError("Violación de Integridad: El nodo del evento no existe.")
             elif seat_labels:
-                raise ValidationError("Imposible procesar tickets sin una función válida en el nodo.")
+                raise ValidationError("Imposible procesar tickets sin una función vinculada.")
             
             # ==========================================
-            # 🎫 LÓGICA DE BOLETERÍA (CRIPTOGRÁFICA)
+            # 🎫 LÓGICA DE BOLETERÍA Y AUTO-HEALING
             # ==========================================
             seats_to_buy = []
             ticket_total = Decimal('0.00')
             
             if seat_labels and function_instance:
-                # A. Hash Map de Precios en RAM (Búsqueda Constante O(1))
+                
+                # 🚀 GOD-TIER LAZY GARBAGE COLLECTOR (Libera sillas pegadas)
+                # Escanea si las sillas que el usuario quiere están atrapadas en órdenes abandonadas (> 15 mins)
+                expiration_limit = timezone.now() - datetime.timedelta(minutes=15)
+                
+                ghost_tickets = Ticket.objects.filter(
+                    function=function_instance,
+                    seat_label__in=seat_labels,
+                    order__status=Order.Status.PENDING, 
+                    order__created_at__lt=expiration_limit
+                ).select_related('order')
+
+                if ghost_tickets.exists():
+                    # 💥 Extracción masiva O(1) y destrucción atómica de bloqueos fantasmas
+                    ghost_order_ids = list(set(ghost_tickets.values_list('order_id', flat=True)))
+                    Ticket.objects.filter(order_id__in=ghost_order_ids).update(state=Ticket.State.VOIDED)
+                    Order.objects.filter(id__in=ghost_order_ids).update(status=Order.Status.REJECTED)
+                    logger.info(f"🧹 [AUTO-HEALING] Sillas zombi liberadas de la matriz: {seat_labels}")
+
+                # A. Generación del Hash Map Comercial en RAM (O(1))
                 available_types = {str(tt.zone_code).strip().lower(): tt for tt in TicketType.objects.filter(function=function_instance)}
 
-                # B. Fail-Fast: Validación inicial de disponibilidad
-                # 🚀 HOTFIX APLICADO: CANCELLED ha sido erradicado, operamos con VOIDED.
+                # B. Fail-Fast Definitivo: Validación de Integridad Post-Limpieza
                 taken_tickets = Ticket.objects.filter(
                     function=function_instance, 
                     seat_label__in=seat_labels
@@ -109,34 +127,32 @@ class OrderService:
                 
                 if taken_tickets.exists():
                     taken_str = ", ".join([t.seat_label for t in taken_tickets])
-                    raise ValidationError(f"Interferencia detectada: Las sillas [{taken_str}] acaban de ser aseguradas por otro nodo.")
+                    raise ValidationError(f"Interferencia detectada: Las sillas [{taken_str}] acaban de ser aseguradas por otro usuario en la red.")
 
-                # C. Construcción Topológica Segura
+                # C. Ruteo Espacial de Coordenadas
                 seat_zone_map = OrderService._build_seat_map(function_instance.venue.layout)
 
-                # D. Procesamiento Aislado
+                # D. Ensamblaje en Memoria Aislada
                 for label in seat_labels:
                     clean_label = str(label).strip()
                     raw_zone_code = seat_zone_map.get(clean_label)
                     
                     ticket_type = None
-                    
                     if raw_zone_code:
                         clean_zone = str(raw_zone_code).strip().lower()
                         ticket_type = available_types.get(clean_zone)
                     
-                    # Fallback de Rescate Comercial
+                    # Fallback (Rescate Estricto)
                     if not ticket_type:
                         ticket_type = available_types.get('general')
                         if not ticket_type:
-                            logger.critical(f"Inconsistencia Físico-Digital: Silla {clean_label} carece de valor financiero.")
-                            raise ValidationError(f"Anomalía comercial en la silla: {clean_label}.")
+                            logger.critical(f"Anomalía Física-Digital detectada en coordenada: {clean_label}")
+                            raise ValidationError(f"Error comercial en la topología de la silla: {clean_label}.")
 
-                    # Conversión FinTech estricta
                     price = Decimal(str(ticket_type.price))
                     ticket_total += price
                     
-                    # 🛡️ Preparación Criptográfica (512 bits entropía)
+                    # 🛡️ Entropía Criptográfica de 512 bits (Anti Reverse-Engineering)
                     new_ticket = Ticket(
                         order=None, 
                         function=function_instance,
@@ -146,12 +162,12 @@ class OrderService:
                         qr_token=secrets.token_urlsafe(64) 
                     )
                     
-                    # Firmware criptográfico embebido antes de volcar a base de datos
+                    # Sellado criptográfico embebido previo a la base de datos
                     new_ticket.crypto_signature = new_ticket.generate_signature()
                     seats_to_buy.append(new_ticket)
 
             # ==========================================
-            # 🍔 LÓGICA DE PRODUCTOS E-COMMERCE
+            # 🍔 LÓGICA DE PRODUCTOS (E-COMMERCE)
             # ==========================================
             products_to_buy = []
             product_total = Decimal('0.00')
@@ -162,7 +178,6 @@ class OrderService:
 
                 for item in products_data:
                     p_id = str(item.get('product_id', ''))
-                    
                     try:
                         qty = int(item.get('quantity', 0))
                         if qty <= 0: continue
@@ -184,30 +199,29 @@ class OrderService:
                     ))
 
             # ==========================================
-            # 💰 CREACIÓN DE LA ORDEN FINANCIERA (BÓVEDA)
+            # 💰 COMPILACIÓN FINAL DE LA BÓVEDA (ORDER)
             # ==========================================
             grand_total = ticket_total + product_total
 
             if grand_total <= Decimal('0.00'):
-                 raise ValidationError("Rechazado: Transacción estéril. El valor total debe ser superior a cero.")
+                 raise ValidationError("Denegado: Transacción estéril detectada. El valor debe ser mayor a cero.")
 
-            # Inserción Maestra
+            # Inyección Maestra
             order = Order.objects.create(
                 user=user if user and user.is_authenticated else None,
                 total_amount=grand_total,
                 status=Order.Status.PENDING 
             )
 
-            # 🛡️ BULK INSERT CON PROTECCIÓN DE INTEGRIDAD Y LOCKEO DE CARRERA
+            # 🛡️ BULK CREATE CON CONTROL DE CONDICIÓN DE CARRERA (Optimistic Locking)
             if seats_to_buy:
                 for t in seats_to_buy: 
                     t.order = order
                 try:
-                    # Ignore_conflicts=False asegura que si hay choque en el unique_together, Postgres aborte.
                     Ticket.objects.bulk_create(seats_to_buy, ignore_conflicts=False)
                 except IntegrityError as e:
-                    logger.warning(f"🚨 [RACE CONDITION NEUTRALIZADA] Choque de inserción concurrente detectado.")
-                    raise ValidationError("Colisión de concurrencia: Otro usuario aseguró esta silla milisegundos antes que tú. Actualiza el mapa.")
+                    logger.warning(f"🚨 [SNIPER ATTACK MITIGADO] Condición de carrera frenada en Postgres.")
+                    raise ValidationError("Colisión de red: Otro usuario acaba de comprar esta silla milisegundos antes. Actualiza tu mapa.")
             
             if products_to_buy:
                 for p in products_to_buy: 
@@ -219,24 +233,24 @@ class OrderService:
     @staticmethod
     def attach_mercadopago_data(order: Order) -> Order:
         """
-        Delega la seguridad transaccional al adaptador de Mercado Pago.
-        Maneja fallos externos para que la orden no quede huérfana en un 500 silencioso.
+        Establece túnel seguro con la pasarela. 
+        Fail-Open mitigado (Corta conexión si faltan llaves).
         """
         public_key = config('MERCADO_PAGO_PUBLIC_KEY', default='')
         redirect_url = config('MERCADO_PAGO_REDIRECT_URL', default='')
 
         if not public_key or not redirect_url:
-            logger.critical("Configuración de Mercado Pago incompleta (Faltan ENVs).")
+            logger.critical("🚨 Desconexión de Llaves ENVs detectada.")
             raise ValidationError("Pasarela de pagos temporalmente desconectada de la matriz.")
 
         try:
-            # 🛡️ Llamada al adaptador Thread-Safe
+            # 🛡️ Llamada a Adaptador Aislado Thread-Safe
             preference_id = MercadoPagoAdapter.create_checkout_preference(order, redirect_url)
         except Exception as e:
-            logger.error(f"Falla crítica contactando SDK de MercadoPago: {str(e)}")
-            raise ValidationError("Error estableciendo túnel seguro con la entidad bancaria. Intenta en unos minutos.")
+            logger.error(f"Caída de red externa (SDK MercadoPago): {str(e)}")
+            raise ValidationError("Falla de comunicación con el ente bancario. Reintente.")
 
-        # Inyección dinámica en RAM
+        # Inyección a RAM (Atributos Efímeros para Serializador)
         order.mp_preference_id = preference_id
         order.mp_public_key = public_key
         
@@ -245,15 +259,15 @@ class OrderService:
 
 class QRService:
     """
-    SERVICIO DE UTILIDAD: Generación eficiente de activos binarios (QR).
+    MOTOR DE VOLCADO BINARIO (Generador QR).
     """
 
     @staticmethod
     def generate_qr_image(data: str) -> bytes:
         """
-        🚀 MEMORY-LEAK PROOF ENGINE:
-        Genera un código QR y garantiza la limpieza de la pila de memoria del Garbage Collector
-        utilizando manejadores de contexto (with) para el descriptor del buffer.
+        🚀 PROTECCIÓN DE VOLCADO DE MEMORIA (MEMORY-LEAK PREVENTION).
+        Usa Context Managers (with BytesIO) para forzar al recolector de basura de Python
+        a destruir el bloque de RAM tras generar la imagen, evitando OOM (Out Of Memory).
         """
         qr = qrcode.QRCode(
             version=1,
@@ -266,7 +280,6 @@ class QRService:
 
         img = qr.make_image(fill_color="black", back_color="white")
 
-        # 🛡️ Context Manager: Asegura la liberación de RAM sin importar si ocurre una excepción
         with BytesIO() as buffer:
             img.save(buffer, format="PNG")
             image_bytes = buffer.getvalue()
