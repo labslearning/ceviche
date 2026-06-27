@@ -6,7 +6,8 @@ import urllib.request
 import uuid
 import socket
 import ipaddress
-from urllib.error import URLError
+import gc
+from urllib.error import URLError, HTTPError
 from urllib.parse import urlparse
 from decimal import Decimal, InvalidOperation
 from io import BytesIO
@@ -24,7 +25,7 @@ from django.core.files.base import ContentFile
 from django.core.cache import cache
 
 # 🛡️ IMPORTACIÓN ESTRATÉGICA DE MODELOS
-from apps.orders.models import Order
+from apps.orders.models import Order, Ticket
 from apps.users.models import User
 from apps.events.models import Venue, ShowFunction, TicketType
 
@@ -34,6 +35,19 @@ logger = logging.getLogger(__name__)
 # ==============================================================================
 # 🛡️ MOTOR DE INGESTIÓN ANTI-SSRF & ANTI-MALWARE (Silicon Valley Red Team)
 # ==============================================================================
+
+class NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """
+    🛡️ INTERCEPTOR DE REDIRECCIONES A NIVEL KERNEL HTTP.
+    Bloquea explícitamente ataques de redirección HTTP (301, 302, 307) para evadir 
+    filtros SSRF mediante DNS Rebinding o saltos a infraestructura interna.
+    """
+    def http_error_302(self, req, fp, code, msg, headers):
+        logger.critical(f"🚨 [SSRF REDIRECT BLOCKED] Interceptada redirección maliciosa hacia: {req.full_url}")
+        raise HTTPError(req.full_url, code, "Redirección interceptada por protocolos de seguridad SSRF", headers, fp)
+    
+    http_error_301 = http_error_303 = http_error_307 = http_error_302
+
 
 def validate_safe_url(url: str) -> bool:
     """
@@ -55,7 +69,9 @@ def validate_safe_url(url: str) -> bool:
             return False
         return True
     except Exception as e:
+        logger.error(f"Falla en la validación DNS del origen: {str(e)}")
         return False
+
 
 def process_and_save_poster(show_obj, request):
     """
@@ -76,42 +92,51 @@ def process_and_save_poster(show_obj, request):
         if not validate_safe_url(poster_url):
             raise ValueError("URL rechazada por los protocolos de seguridad militar SSRF.")
 
+        # Construcción de Opener blindado contra redirecciones
+        opener = urllib.request.build_opener(NoRedirectHandler())
+        req = urllib.request.Request(poster_url, headers={
+            'User-Agent': 'CevichePlatform-Security/1.0 (Enterprise Gateway)',
+            'Accept': 'image/webp,image/jpeg,image/png,*/*;q=0.8'
+        })
+        
+        file_content = None
+        
         try:
-            req = urllib.request.Request(poster_url, headers={
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': 'image/webp,image/jpeg,image/png,*/*;q=0.8'
-            })
-            
-            # 🛡️ Fail-Fast Timeout (Anti-Slowloris)
-            with urllib.request.urlopen(req, timeout=5) as response:
+            # 🛡️ Fail-Fast Timeout (Anti-Slowloris y ataques de latencia)
+            with opener.open(req, timeout=5) as response:
                 MAX_SIZE = 5 * 1024 * 1024 # 5MB Hard Limit
                 file_content = response.read(MAX_SIZE + 1)
                 
                 if len(file_content) > MAX_SIZE:
-                    raise ValueError("Payload excede cuota de 5MB. Ingestión abortada.")
+                    raise ValueError("Payload excede cuota de 5MB. Ingestión abortada para proteger la RAM.")
 
                 # 3. 🛡️ Validación Criptográfica del MIME (Anti-Spoofing & Malware)
                 from PIL import Image, UnidentifiedImageError
                 Image.MAX_IMAGE_PIXELS = 20000000 # Previene Image Decompression Bombs
                 
-                # Context Manager `with` asegura la destrucción en RAM instantánea
+                # Context Manager `with` asegura la lectura segura en RAM
                 try:
                     with Image.open(BytesIO(file_content)) as img:
-                        img.verify() # Escanea los bytes buscando cabeceras corruptas
+                        img.verify() # Escanea los bytes buscando cabeceras corruptas sin ejecutar la imagen
                         img_format = img.format.lower()
                         if img_format not in ['jpeg', 'jpg', 'png', 'webp']:
-                            raise ValueError("Formato de imagen no soportado o archivo corrupto.")
+                            raise ValueError(f"Formato de imagen {img_format} no soportado o archivo corrupto.")
                 except UnidentifiedImageError:
-                    raise ValueError("Firma binaria maliciosa detectada. Abortando.")
+                    raise ValueError("Firma binaria maliciosa detectada. Proceso de ingestión abortado.")
 
                 # Genera nombre UUID estricto para evitar ataques de Path Traversal
                 safe_name = f"poster_{uuid.uuid4().hex[:12]}.{img_format}"
                 show_obj.poster.save(safe_name, ContentFile(file_content), save=True)
                 
-        except urllib.error.URLError as e:
-            logger.warning(f"Error de red escaneando URL: {str(e)}")
+        except (URLError, HTTPError) as e:
+            logger.warning(f"Error de red escaneando URL remota: {str(e)}")
         except Exception as e:
             logger.error(f"Fallo en motor de Ingestión Multimedia: {str(e)}")
+        finally:
+            # 🧼 PROTOCOLO ANTI-MEMORY DUMPING (Garbage Collection OOM Safe)
+            if file_content is not None:
+                del file_content
+            gc.collect()
 
 
 # ==============================================================================
@@ -120,11 +145,14 @@ def process_and_save_poster(show_obj, request):
 
 class SuperUserRequiredMixin(UserPassesTestMixin):
     def test_func(self):
-        return self.request.user.is_superuser or self.request.user.is_staff
+        return self.request.user.is_authenticated and (self.request.user.is_superuser or self.request.user.is_staff)
     
     def handle_no_permission(self):
-        logger.warning(f"🚨 IDOR ATTEMPT: Intento de acceso denegado. IP/User: {self.request.user}")
+        ip = self.request.META.get('REMOTE_ADDR', 'Unknown')
+        user_info = self.request.user.email if self.request.user.is_authenticated else 'Anon'
+        logger.warning(f"🚨 [IDOR ATTEMPT BLOCKED] Intento de acceso administrativo denegado. User: {user_info} | IP: {ip}")
         return redirect('dashboard:login')
+
 
 class DashboardLoginView(LoginView):
     template_name = 'dashboard/login.html'
@@ -144,12 +172,12 @@ class DashboardHomeView(LoginRequiredMixin, SuperUserRequiredMixin, TemplateView
         context = super().get_context_data(**kwargs)
         
         # 🚀 CACHÉ EN RAM: Las métricas pesadas se calculan 1 vez cada 5 minutos
-        cache_key = "dashboard_metrics_cache"
+        cache_key = "dashboard_metrics_cache_v2"
         metrics = cache.get(cache_key)
 
         if not metrics:
             now = timezone.now()
-            approved_orders = Order.objects.filter(status='APPROVED')
+            approved_orders = Order.objects.filter(status=Order.Status.APPROVED)
 
             # Agregaciones Base O(1) de red
             stats = approved_orders.aggregate(
@@ -161,7 +189,7 @@ class DashboardHomeView(LoginRequiredMixin, SuperUserRequiredMixin, TemplateView
 
             # 🚀 BIG-O OPTIMIZATION: Gráfica de 7 días resuelta en UN SOLO QUERY SQL
             seven_days_ago = now - datetime.timedelta(days=6)
-            seven_days_ago = seven_days_ago.replace(hour=0, minute=0, second=0)
+            seven_days_ago = seven_days_ago.replace(hour=0, minute=0, second=0, microsecond=0)
             
             daily_stats = approved_orders.filter(created_at__gte=seven_days_ago)\
                 .annotate(day=TruncDay('created_at'))\
@@ -170,7 +198,10 @@ class DashboardHomeView(LoginRequiredMixin, SuperUserRequiredMixin, TemplateView
                 .order_by('day')
 
             # Indexamos los resultados de BD en un diccionario hash O(1)
-            sales_by_day = {stat['day'].strftime('%Y-%m-%d'): stat['daily_sales'] for stat in daily_stats}
+            sales_by_day = {}
+            for stat in daily_stats:
+                if stat['day']:
+                    sales_by_day[stat['day'].strftime('%Y-%m-%d')] = stat['daily_sales']
 
             chart_labels = []
             chart_data = []
@@ -219,7 +250,11 @@ class OrderListView(LoginRequiredMixin, SuperUserRequiredMixin, ListView):
             )
         
         if status_filter and status_filter != 'Todos los Estados':
-            status_map = {'Aprobados': 'APPROVED', 'Pendientes': 'PENDING', 'Rechazados': 'REJECTED'}
+            status_map = {
+                'Aprobados': Order.Status.APPROVED, 
+                'Pendientes': Order.Status.PENDING, 
+                'Rechazados': Order.Status.REJECTED
+            }
             db_status = status_map.get(status_filter, status_filter)
             queryset = queryset.filter(status=db_status)
                 
@@ -339,7 +374,7 @@ class ShowFunctionCreateView(LoginRequiredMixin, SuperUserRequiredMixin, View):
     """
     def post(self, request, *args, **kwargs):
         try:
-            # 🛡️ ACID SHIELD: Todo se guarda, o todo explota y se revierte
+            # 🛡️ ACID SHIELD: Todo se guarda, o todo explota y se revierte automáticamente
             with transaction.atomic():
                 name = request.POST.get('name')
                 description = request.POST.get('description', '')
@@ -368,7 +403,7 @@ class ShowFunctionCreateView(LoginRequiredMixin, SuperUserRequiredMixin, View):
                     active=True 
                 )
 
-                # 2. Ingestión Multimedia Protegida
+                # 2. Ingestión Multimedia Protegida (SSRF & OOM Safe)
                 process_and_save_poster(new_show, request)
 
                 # 3. 🚀 INYECCIÓN DINÁMICA DE PRECIOS Y ZONAS
@@ -481,6 +516,8 @@ class ShowFunctionUpdateView(LoginRequiredMixin, SuperUserRequiredMixin, View):
                     function.date_time = timezone.make_aware(naive_dt)
                 
                 function.save()
+                
+                # Ingestión Multimedia Segura
                 process_and_save_poster(function, request)
 
                 # Actualización de Matriz de Precios
@@ -509,20 +546,31 @@ class ShowFunctionUpdateView(LoginRequiredMixin, SuperUserRequiredMixin, View):
 
 
 # ==============================================================================
-# 🚨 5. PROTOCOLO DE ERRADICACIÓN DE NODOS (DELETE VIEW)
+# 🚨 5. PROTOCOLO DE ERRADICACIÓN DE NODOS (Data Protection Shield)
 # ==============================================================================
 
 class ShowFunctionDeleteView(LoginRequiredMixin, SuperUserRequiredMixin, View):
     """
-    🚨 PROTOCOLO DE PURGA ATÓMICA
-    Erradica un evento de la base de datos de forma irreversible.
+    🚨 PROTOCOLO DE PURGA ATÓMICA PROTEGIDA
+    Erradica un evento, bloqueando la acción si compromete el Ledger Financiero.
     """
     def post(self, request, pk):
         try:
             event = get_object_or_404(ShowFunction, pk=pk)
+            
+            # 🛡️ INTEGRITY SHIELD: Previene la corrupción del Ledger y Pérdida de Tickets Vendidos
+            if event.sold_tickets.exists():
+                logger.critical(f"🚨 [DELETE ACTION BLOCKED] Intento de destruir evento financiado. User: {request.user.email}")
+                return JsonResponse({
+                    'status': 'error', 
+                    'message': 'Integridad Bloqueada: El evento posee boletos vendidos. Desactívelo en lugar de borrarlo.'
+                }, status=403)
+            
             event_name = event.name
             event.delete()
-            logger.info(f"💣 Nodo Erradicado: {event_name} (ID: {pk}) por el staff {request.user.email}")
+            logger.info(f"💣 Nodo Erradicado Limpiamente: {event_name} (ID: {pk}) por el staff {request.user.email}")
+            
             return JsonResponse({'status': 'success', 'message': 'Nodo erradicado exitosamente'})
+            
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': str(e)}, status=400)

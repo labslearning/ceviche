@@ -1,7 +1,8 @@
 """
 👁️ TRANSMISOR TELEMÉTRICO "EYE OF GOD" (GRADO FINTECH MÁXIMO).
-Arquitectura: AsyncWebsocketConsumer con defensa nativa anti-CSWSH y cuotas limitadoras estrictas.
-Diseñado por los Cónclaves unificados para mitigar ataques de secuestro y envenenamiento de sockets.
+Ruta: apps/dashboard/consumers.py
+Arquitectura: AsyncWebsocketConsumer O(1)
+Defensas Activas: Anti-CSWSH, Zero-Trust is_staff Auth, Anti-Memory Dumping, Anti-DDoS Tarpit.
 """
 import json
 import logging
@@ -10,95 +11,123 @@ from urllib.parse import urlparse
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.conf import settings
 
-# 🔒 Logger asincrónico aislado inmune a interferencia de hilos de red
+# 🔒 Logger asincrónico aislado, inmune a bloqueos del Global Interpreter Lock (GIL)
 logger = logging.getLogger(__name__)
 
 class EventDashboardConsumer(AsyncWebsocketConsumer):
     """
-    Bóveda Multiplexada Asíncrona: Distribución de telemetría reactiva en O(1).
+    Bóveda Multiplexada Asíncrona: Distribución de telemetría reactiva y logs financieros en O(1).
     """
+    
+    # Caché estático de hosts a nivel de clase para evitar cálculos O(N) por cada handshake de socket
+    _cached_allowed_hosts = None
+
+    @classmethod
+    def _get_allowed_hosts(cls):
+        if cls._cached_allowed_hosts is None:
+            cls._cached_allowed_hosts = set(getattr(settings, 'ALLOWED_HOSTS', ['localhost', '127.0.0.1']))
+        return cls._cached_allowed_hosts
+
     async def connect(self):
         # ==============================================================================
-        # 🛡️ DEFENSA ANTI-CSWSH (Cross-Site WebSocket Hijacking Shield)
+        # 1. 🛡️ VALIDADOR DE AUTENTICACIÓN ZERO-TRUST (KERNEL LEVEL)
+        # ==============================================================================
+        self.user = self.scope.get('user')
+        # Si el socket intenta abrirse sin sesión activa de Staff, se destruye el handshake inmediatamente
+        if not self.user or not self.user.is_authenticated or not self.user.is_staff:
+            logger.critical("🚨 [WS ZERO-TRUST SHIELD] Intento de conexión anónima o sin privilegios rechazada.")
+            await self.close(code=4401)
+            return
+
+        # ==============================================================================
+        # 2. 🛡️ DEFENSA ANTI-CSWSH (Cross-Site WebSocket Hijacking)
         # ==============================================================================
         headers = dict(self.scope.get('headers', []))
         origin_bytes = headers.get(b'origin', b'')
         
-        # Extracción y parsing seguro del Origin para evitar inyecciones de cabecera
         if origin_bytes:
-            origin_url = origin_bytes.decode('utf-8')
-            parsed_origin = urlparse(origin_url)
-            hostname = parsed_origin.hostname
-            
-            # Restricción estricta de origen en entornos de producción en Railway
-            allowed_hosts = getattr(settings, 'ALLOWED_HOSTS', ['localhost', '127.0.0.1'])
-            
-            # Si el host que solicita el WebSocket no pertenece a la infraestructura viva, se corta de inmediato
-            if hostname not in allowed_hosts and not settings.DEBUG:
-                logger.critical(f"🚨 [CSWSH ATTACK THWARTED] Intento de conexión no autorizada desde origen prohibido: {origin_url}")
-                await self.close(code=4403) # Código de cierre personalizado: Prohibido por políticas
+            try:
+                origin_url = origin_bytes.decode('utf-8')
+                parsed_origin = urlparse(origin_url)
+                hostname = parsed_origin.hostname
+                
+                # Validación de seguridad O(1) usando Hash Sets
+                allowed_hosts = self._get_allowed_hosts()
+                
+                if hostname not in allowed_hosts and not settings.DEBUG:
+                    logger.critical(f"🚨 [CSWSH ATTACK THWARTED] Socket abortado desde origen hostil: {hostname}")
+                    await self.close(code=4403)
+                    return
+            except Exception as e:
+                logger.error(f"⚠️ [MALFORMED HEADER] Error analizando origin: {str(e)}")
+                await self.close(code=4400)
                 return
 
-        # Validación estricta de parámetros de enrutamiento
+        # ==============================================================================
+        # 3. ENRUTAMIENTO DINÁMICO Y AISLAMIENTO DE GRUPOS
+        # ==============================================================================
         self.event_id = self.scope['url_route']['kwargs'].get('event_id')
-        if not self.event_id:
-            logger.warning("⚠️ [WEBSOCKET CONNECT REJECTED] Solicitud sin ID de evento válido.")
-            await self.close(code=4400)
-            return
+        
+        if self.event_id:
+            self.group_name = f"event_{self.event_id}_dashboard"
+        else:
+            # Fallback al canal maestro de auditoría si no hay un evento específico en el routing
+            self.group_name = "admin_fintech_audit_stream"
 
-        self.group_name = f"event_{self.event_id}_dashboard"
-
-        # Unir de manera atómica el hilo persistente al grupo en memoria de Redis Channel Layer
+        # Memoria Redis: Unir de manera atómica el hilo al clúster de telemetría
         await self.channel_layer.group_add(
             self.group_name,
             self.channel_name
         )
         
-        # Aceptamos la solicitud únicamente tras pasar los filtros Zero-Trust
         await self.accept()
-        logger.info(f"📡 [WEBSOCKET CONNECTED] Canal de telemetría seguro enlazado al clúster: {self.group_name}")
+        logger.info(f"📡 [CONCLAVE UPLINK ESTABLISHED] {self.user.email} enlazado al clúster: {self.group_name}")
 
     async def disconnect(self, close_code):
-        # Erradicación manual forzada de punteros de la RAM de Redis y Daphne al cerrar la sesión
+        """
+        🧼 DEFENSA ANTI-MEMORY DUMPING Y ZOMBIE SOCKETS.
+        Erradicación forzada de punteros de la RAM al cerrar la sesión.
+        """
         if hasattr(self, 'group_name') and self.group_name:
             await self.channel_layer.group_discard(
                 self.group_name,
                 self.channel_name
             )
-        logger.info(f"🔌 [WEBSOCKET DISCONNECTED] Nodo de telemetría retirado de la red: {getattr(self, 'group_name', 'UNKNOWN')}")
-        gc.collect()
+        logger.info(f"🔌 [UPLINK TERMINATED] Nodo retirado (Código: {close_code})")
+        gc.collect() # Forzamos la limpieza del Garbage Collector en memoria RAM
 
     async def receive(self, text_data=None, bytes_data=None):
         """
-        🛡️ DEFENSA COTA DE RED (Anti-RAM Exhaustion / Denial of Service).
-        Tolerancia cero a tramas entrantes desde el cliente en dashboards de lectura de analíticas.
+        ⛔ DEFENSA COTA DE RED (Anti-RAM Exhaustion / DDoS).
+        Tolerancia cero a inyección de tramas. El canal es estrictamente de lectura.
         """
-        # Si el cliente vulnera el protocolo e intenta inyectar tramas masivas de datos para saturar el pool,
-        # la exclusión defensiva del Cónclave destruye la conexión de forma inmediata.
-        logger.warning(f"🚨 [PROTOCOL VIOLATION] Cliente intentó transmitir datos en un canal Append-Only. Cerrando conexión.")
-        await self.close(code=4429) # Código de cierre por abuso de tasa de red / inundación
+        logger.warning(f"🚨 [PROTOCOL VIOLATION] Intento de inyección de tramas detectado. Destruyendo nodo.")
+        await self.close(code=4429)
+
+    # ==============================================================================
+    # MULTIPLEXOR DE TELEMETRÍA (METRICAS Y AUDITORÍA INMUTABLE)
+    # ==============================================================================
 
     async def update_metrics(self, event):
-        """
-        Gatillo de difusión asíncrona provisto por el Channel Layer de Redis en complejidad O(1).
-        Inyecta las tramas de escaneo directamente al frontend de forma reactiva y atómica.
-        """
+        """Difusión de escaneos en puertas en complejidad O(1)."""
         try:
-            message = event.get('message', 'Actualización de métricas de red')
-            metrics = event.get('metrics', {})
-
-            # Serialización en RAM volátil sin tocar almacenamiento
             payload = json.dumps({
                 "type": "METRICS_UPDATE",
-                "message": str(message),
-                "metrics": metrics
-            }, separators=(',', ':')) # Compactación máxima de bytes para el túnel TCP
-
+                "message": str(event.get('message', '')),
+                "metrics": event.get('metrics', {})
+            }, separators=(',', ':'))
             await self.send(text_data=payload)
-            
         except Exception as exc:
-            logger.error(f"❌ [TELEMETRY BROADCAST FAIL] Caída en el buffer de transmisión: {str(exc)}")
+            logger.error(f"❌ [METRICS BROADCAST FAIL]: {str(exc)}")
         finally:
-            # Protocolo antimemory dumping local
-            if 'payload' in locals():
-                del payload
+            if 'payload' in locals(): del payload
+
+    async def send_audit_event(self, event):
+        """Difusión de transacciones del Ledger y rastreo exclusivo de envíos por Email."""
+        try:
+            payload = json.dumps(event.get("payload", {}), separators=(',', ':'))
+            await self.send(text_data=payload)
+        except Exception as exc:
+            logger.error(f"❌ [AUDIT BROADCAST FAIL]: {str(exc)}")
+        finally:
+            if 'payload' in locals(): del payload

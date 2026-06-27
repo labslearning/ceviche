@@ -20,10 +20,10 @@ from apps.events.models import ShowFunction
 logger = logging.getLogger(__name__)
 
 # ==============================================================================
-# 0. MOTORES CRIPTOGRÁFICOS (O(1) Memory Footprint)
+# 0. MOTORES CRIPTOGRÁFICOS Y DE ENTROPÍA (O(1) Memory Footprint)
 # ==============================================================================
 def generate_order_reference():
-    """Entropía híbrida: Sortability temporal + Colision Resistance (Hex)."""
+    """Entropía híbrida: Sortability temporal + Collision Resistance (Hex)."""
     timestamp_hex = hex(int(timezone.now().timestamp() * 10000))[2:]
     random_hex = secrets.token_hex(4)
     return f"CEV-{timestamp_hex.upper()}-{random_hex.upper()}"
@@ -123,13 +123,9 @@ class Order(models.Model):
 
 
 # ==============================================================================
-# 2. EL TICKET (BÓVEDA DE ACCESO ASIMÉTRICA)
+# 2. EL TICKET (BÓVEDA DE ACCESO ASIMÉTRICA ECDSA)
 # ==============================================================================
 class Ticket(models.Model):
-    """
-    Control de Acceso Físico. 
-    Desacoplado de la criptografía simétrica; utiliza validación asimétrica ECDSA (ES256).
-    """
     class State(models.TextChoices):
         RESERVED = 'RESERVED', _('Reservado')
         VALID = 'VALID', _('Válido / Activo')
@@ -148,14 +144,15 @@ class Ticket(models.Model):
     seat_category = models.CharField(max_length=50)
     price_at_purchase = models.DecimalField(max_digits=10, decimal_places=2)
     
-    # 🛡️ FIX: Ampliación a 512 caracteres para almacenar firmas JWT ECDSA sin truncamiento
     qr_token = models.CharField(max_length=512, unique=True, default=generate_secure_token, editable=False, db_index=True)
     
-    # Mantenido como Checksum interno secundario (Retrocompatibilidad DB)
     crypto_signature = models.CharField(max_length=64, editable=False)
     key_version = models.PositiveIntegerField(default=1, editable=False)
     
     state = models.CharField(max_length=20, choices=State.choices, default=State.RESERVED, db_index=True)
+    
+    # Caché estático de llave pública para evitar Memory Dumping O(N) por latencia de carga en escaneos masivos
+    _cached_public_key = None
 
     class Meta:
         unique_together = ('function', 'seat_label') 
@@ -163,12 +160,9 @@ class Ticket(models.Model):
             models.Index(fields=['function', 'seat_label', 'state']),
             models.Index(fields=['qr_token', 'state']),
         ]
-        constraints = [
-            models.CheckConstraint(check=Q(price_at_purchase__gte=Decimal('0.00')), name='ticket_price_positive')
-        ]
 
     def generate_signature(self):
-        """Checksum de redundancia interna (Integridad local, no usado en puerta)."""
+        """Checksum de redundancia interna DB."""
         secret_key = getattr(settings, f'TICKET_SECRET_KEY_V{self.key_version}', settings.SECRET_KEY)
         payload = f"{self.id}:{self.function_id}:{self.seat_label}"
         return hmac.new(secret_key.encode('utf-8'), payload.encode('utf-8'), hashlib.sha256).hexdigest()
@@ -178,35 +172,36 @@ class Ticket(models.Model):
             self.crypto_signature = self.generate_signature()
         super().save(*args, **kwargs)
 
+    @classmethod
+    def _get_clean_public_key(cls):
+        """Acceso atómico en memoria RAM para la validación asimétrica."""
+        if cls._cached_public_key is None:
+            raw_key = config('ECDSA_PUBLIC_KEY', default="")
+            cls._cached_public_key = raw_key.replace('\\n', '\n').encode('utf-8')
+        return cls._cached_public_key
+
     def process_scan(self, gate_id: str, scanner_agent_id: str) -> tuple[bool, str]:
         """
-        📐 DECODIFICADOR CRIPTOGRÁFICO ECDSA Y MÁQUINA DE ESTADOS (Fase 7).
-        Opera con llave pública. Si se filtra, los atacantes no pueden crear tickets, solo leerlos.
+        DECODIFICADOR CRIPTOGRÁFICO DE CURVA ELÍPTICA.
+        Validación matemática offline y máquina de estados con mitigación de Race Conditions (O(1)).
         """
-        # 1. Validación Matemática (Aislamiento Offline Simulator)
-        public_key_pem = config('ECDSA_PUBLIC_KEY', default=None)
-        if public_key_pem:
+        public_key_bytes = self._get_clean_public_key()
+        if public_key_bytes:
             try:
-                clean_public_key = public_key_pem.replace('\\n', '\n').encode('utf-8')
-                # Verificación estricta de la firma matemática inyectada en el QR del cliente
-                decoded_payload = jwt.decode(self.qr_token, clean_public_key, algorithms=["ES256"])
-                
+                decoded_payload = jwt.decode(self.qr_token, public_key_bytes, algorithms=["ES256"])
                 if decoded_payload.get('sub') != self.id.hex:
                     self._log_scan(gate_id, scanner_agent_id, 'DENIED', "SPOOFING_HUELLA_INVALIDA", self.state)
                     return False, "ERROR: HUELLA DIGITAL FALSIFICADA"
-                    
             except jwt.ExpiredSignatureError:
                 self._log_scan(gate_id, scanner_agent_id, 'DENIED', "TOKEN_EXPIRADO", self.state)
                 return False, "ERROR: TOKEN DE ACCESO CADUCADO"
             except jwt.InvalidTokenError:
-                # Si llegamos aquí, se intenta un Fallback (en caso de que el token sea anterior a la Fase 2)
                 pass 
 
-        # 2. Exclusión Mutua Transaccional (Pessimistic Locking O(1))
+        # Exclusión Mutua Transaccional con timeout ultracorto
         try:
             with transaction.atomic():
                 locked_ticket = Ticket.objects.select_for_update(nowait=True, of=('self',)).get(id=self.id)
-                
                 new_state, action, reason, success = None, None, "OK", False
 
                 if locked_ticket.state in [self.State.BLOCKED, self.State.VOIDED, self.State.REFUNDED]:
@@ -215,7 +210,6 @@ class Ticket(models.Model):
                     action, reason = 'DENIED', "Ticket finalizado/consumido."
                 elif locked_ticket.state == self.State.RESERVED:
                     action, reason = 'DENIED', "Reserva sin pago consolidado."
-                
                 elif locked_ticket.state in [self.State.VALID, self.State.TEMP_EXIT]:
                     new_state, action, success = self.State.INSIDE, 'ENTRY', True
                 elif locked_ticket.state == self.State.INSIDE:
@@ -230,12 +224,10 @@ class Ticket(models.Model):
                 return success, reason
 
         except OperationalError:
-            self._log_scan(gate_id, scanner_agent_id, 'DENIED', "Race Condition: Escaneo Simultáneo", self.state)
-            return False, "ALERTA: PROCESAMIENTO EN OTRA PUERTA"
+            self._log_scan(gate_id, scanner_agent_id, 'DENIED', "Colisión DB: Escaneo Simultáneo", self.state)
+            return False, "ALERTA: INTERFERENCIA EN PUERTA. REINTENTE."
 
     def _log_scan(self, gate, agent, action, reason, state_at_moment):
-        """Inyección O(1) en el Ledger de Auditoría Forense."""
-        # FIX BIG O: Extracción optimizada (.values_list) en lugar de instanciar un objeto completo en RAM
         last_hash = TicketScan.objects.filter(ticket=self).order_by('-timestamp').values_list('integrity_hash', flat=True).first()
         prev_hash = last_hash if last_hash else "GENESIS_BLOCK"
 
@@ -250,7 +242,6 @@ class Ticket(models.Model):
 # 3. EL LEDGER (TRUE BLOCKCHAIN IMMUTABLE RECORD)
 # ==============================================================================
 class TicketScan(models.Model):
-    """Auditoría Forense ligada matemáticamente en cadena."""
     class Action(models.TextChoices):
         ENTRY = 'ENTRY', _('Entrada Autorizada')
         EXIT = 'EXIT', _('Salida Temporal')
@@ -278,17 +269,14 @@ class TicketScan(models.Model):
         ]
 
     def _generate_integrity_hash(self):
-        payload = json.dumps([
-            str(self.ticket_id), str(self.gate_id), str(self.action), 
-            str(self.state_at_scan), str(self.timestamp.isoformat()), 
-            str(self.previous_hash)
-        ], separators=(',', ':'))
+        # Timezone blindado en bloque Epoch para evitar variaciones decimales en microsegundos
+        safe_time = str(int(self.timestamp.timestamp()))
+        payload = f"{self.ticket_id}:{self.gate_id}:{self.action}:{self.state_at_scan}:{safe_time}:{self.previous_hash}"
         return hashlib.sha256(payload.encode('utf-8')).hexdigest()
 
     def save(self, *args, **kwargs):
         if self.pk is not None:
             raise ValidationError("Violación Criptográfica: Los bloques del Ledger son Append-Only.")
-            
         self.integrity_hash = self._generate_integrity_hash()
         super().save(*args, **kwargs)
 
@@ -297,7 +285,52 @@ class TicketScan(models.Model):
 
 
 # ==============================================================================
-# 4. E-COMMERCE & ACCESORIOS (AISLADO)
+# 4. AUDITORÍA DEL ADMINISTRADOR (PANEL DASHBOARD METADATA)
+# ==============================================================================
+class AdminPaymentLedger(models.Model):
+    """
+    Registro inmutable de la Pasarela de Pagos.
+    Protege el negocio contra discrepancias de contracargos.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    order = models.ForeignKey(Order, on_delete=models.PROTECT, related_name='payment_ledgers', db_index=True)
+    gateway = models.CharField(max_length=50, default='MercadoPago')
+    gateway_reference = models.CharField(max_length=255, unique=True, db_index=True)
+    raw_payload = models.JSONField(help_text="Copia binaria/JSON exacta del Webhook")
+    processed_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ['-processed_at']
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Violación de Auditoría: Logs de pago inmutables.")
+
+
+class AdminCommunicationLog(models.Model):
+    """
+    Sistema de Tracking estricto de mensajería (Solo correo electrónico, arquitectura sin P2P).
+    Garantiza la trazabilidad del código QR criptográfico enviado al usuario final.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='communication_logs', db_index=True)
+    ticket = models.ForeignKey(Ticket, on_delete=models.SET_NULL, null=True, blank=True)
+    
+    recipient_email = models.EmailField(db_index=True)
+    subject = models.CharField(max_length=255)
+    delivery_status = models.CharField(
+        max_length=20, 
+        choices=[('SENT', 'Enviado Correctamente'), ('FAILED', 'Fallo de Despacho')],
+        db_index=True
+    )
+    sent_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    error_traceback = models.TextField(blank=True, null=True)
+
+    class Meta:
+        ordering = ['-sent_at']
+
+
+# ==============================================================================
+# 5. E-COMMERCE & ACCESORIOS (MERCH AISLADO)
 # ==============================================================================
 class OrderItem(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -311,7 +344,10 @@ class OrderItem(models.Model):
     class Meta:
         constraints = [
             models.CheckConstraint(check=Q(quantity__gt=0), name='item_quantity_positive'),
-            models.CheckConstraint(check=Q(price_at_purchase__gte=Decimal('0.00')) & Q(discount_applied__gte=Decimal('0.00')), name='item_prices_positive')
+            models.CheckConstraint(
+                check=Q(price_at_purchase__gte=Decimal('0.00')) & Q(discount_applied__gte=Decimal('0.00')), 
+                name='item_prices_positive'
+            )
         ]
 
     def clean(self):
