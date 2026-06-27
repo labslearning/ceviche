@@ -10,7 +10,7 @@ click==8.3.1
 click-didyoumean==0.3.1
 click-plugins==1.1.1.2
 click-repl==0.3.0
-cryptography==42.0.2
+cryptography==42.0.5
 dj-database-url==2.1.0
 Django==5.0.2
 django-cors-headers==4.3.1
@@ -30,7 +30,8 @@ pypng==0.20220715.0
 python-dateutil==2.9.0.post0
 python-decouple==3.8
 pytz==2025.2
-qrcode==7.4.2
+qrcode[pil]==7.4.2
+PyJWT==2.8.0
 redis==5.0.1
 requests==2.31.0
 six==1.17.0
@@ -42,3 +43,6 @@ vine==5.1.0
 wcwidth==0.5.3
 whitenoise==6.6.0
 mercadopago==2.2.0
+reportlab==4.1.0
+channels==4.0.0
+channels-redis==4.2.0

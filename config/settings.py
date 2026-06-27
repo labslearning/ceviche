@@ -272,3 +272,34 @@ JAZZMIN_SETTINGS = {
 # IMPORTANTE: En el panel de variables de Railway debes declarar estas llaves EXACTAMENTE ASÍ
 MERCADOPAGO_ACCESS_TOKEN = config('MERCADOPAGO_ACCESS_TOKEN', default='')
 MERCADOPAGO_PUBLIC_KEY = config('MERCADOPAGO_PUBLIC_KEY', default='')
+
+import os
+import logging
+
+logger = logging.getLogger(__name__)
+
+# 🔒 Llave para el firmado digital de tickets (ECDSA - ES256)
+ECDSA_PRIVATE_KEY = os.environ.get('ECDSA_PRIVATE_KEY', '').encode('utf-8')
+
+# 📡 Configuración de Enrutamiento ASGI para Channels
+ASGI_APPLICATION = 'config.asgi.application'
+
+# 🏎️ Extracción de la infraestructura de red de Railway
+RAILWAY_REDIS_URL = os.environ.get('REDIS_URL')
+
+if not RAILWAY_REDIS_URL:
+    # Fail-Fast: Alarma crítica si Railway no ha inyectado la variable
+    logger.critical("🚨 [INFRASTRUCTURE ERROR] La variable REDIS_URL no está presente en el entorno de Railway.")
+    # Fallback puramente elástico para evitar que rompa el build estático si es necesario,
+    # pero apuntando a la desconexión total en ejecución.
+    RAILWAY_REDIS_URL = 'redis://127.0.0.1:6379'
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'config': {
+            # channels_redis procesa nativamente el string completo con credenciales provisto por Railway
+            "hosts": [RAILWAY_REDIS_URL],
+        },
+    },
+}

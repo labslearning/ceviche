@@ -1,59 +1,56 @@
 """
-🛣️ ENRUTADOR MAESTRO DE ÓRDENES Y PAGOS
-Arquitectura: REST Framework Router + Endpoints Financieros Aislados
+🛣️ ENRUTADOR MAESTRO DE ÓRDENES, PAGOS Y AUTO-RESCATE (GRADO BANCARIO).
+Arquitectura: REST Framework Router + Endpoints Financieros Aislados en RAM.
 """
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
-# 1. Importamos las vistas clásicas (CRUD, QRs, Consultas de Pago)
-from .views import OrderViewSet, TicketViewSet
+# 1. Importación de Controladores Base (CRUD, Visor Vectorial de Tickets)
+from apps.orders.api.views import (
+    OrderViewSet, 
+    TicketViewSet, 
+    OrderRescueAPIView  # 👈 INYECTADO: Resuelve el NameError de raíz
+)
 
-# 2. Importamos la nueva Bóveda Transaccional God-Tier (Mercado Pago)
-#from .api.mercadopago import CheckoutMercadoPagoAPIView
-#from .webhooks.mercadopago_ipn import MercadoPagoWebhookAPIView
+# 2. Importación del Webhook Central Transaccional de Mercado Pago (Fase 3)
+from apps.orders.webhooks.views import MercadoPagoWebhookView
 
-# ✅ CORRECTO: Apuntamos directamente al archivo en la misma carpeta 'api'
-from .mercadopago import CheckoutMercadoPagoAPIView
-
-# ✅ CORRECTO: Subimos un nivel (..) para salir de 'api' y entrar a 'webhooks'
-from ..webhooks.mercadopago_ipn import MercadoPagoWebhookAPIView
-
-# ==========================================
+# ==========================================================
 # 🔄 ENRUTADOR AUTOMÁTICO (API GATEWAY LOCAL)
-# ==========================================
+# ==========================================================
 router = DefaultRouter()
 router.register(r'orders', OrderViewSet, basename='orders')
 router.register(r'tickets', TicketViewSet, basename='tickets')
 
 urlpatterns = [
     # ==========================================================
-    # 🛡️ ENDPOINTS CRÍTICOS FINANCIEROS (Prioridad Máxima)
-    # Deben ir antes del router para evitar colisiones de Regex
+    # 🛡️ ENDPOINTS CRÍTICOS FINANCIEROS (Prioridad Máxima de Red)
+    # Ubicados antes del router para anular colisiones de Regex
     # ==========================================================
     
-    # 📡 1. EL RADAR (Webhook IPN)
-    # Ruta real: /api/orders/webhook/mercadopago/
+    # 🛟 1. PORTAL DE AUTO-RESCATE CRIPTOGRÁFICO (Fase 5)
+    # Permite la re-dirección única de pases vectoriales utilizando el ID de Mercado Pago
     path(
-        'webhook/mercadopago/', 
-        MercadoPagoWebhookAPIView.as_view(), 
-        name='mp-webhook'
+        'rescue/', 
+        OrderRescueAPIView.as_view(), 
+        name='order_rescue_api'
     ),
     
-    # 💳 2. EL MOTOR DE PAGOS (Checkout)
-    # Ruta real: /api/orders/checkout/mercadopago/
+    # 🛰️ 2. EL RADAR (Webhook Central Unificado - Fase 3)
+    # Captura las notificaciones de acreditación de dinero real libres de loops DoS
     path(
-        'checkout/mercadopago/', 
-        CheckoutMercadoPagoAPIView.as_view(), 
-        name='mp-checkout'
+        'webhook/mercadopago/', 
+        MercadoPagoWebhookView.as_view(), 
+        name='mp_webhook_secure'
     ),
 
     # ==========================================================
-    # 🔄 RUTAS DINÁMICAS (ViewSets)
+    # 🔄 RUTAS DINÁMICAS INDEXADAS (ViewSets)
     # ==========================================================
-    # Incluye:
-    # GET  /api/orders/                 -> Listar órdenes
-    # GET  /api/orders/{id}/payment_info/ -> Regenerar pago anti-IDOR
-    # GET  /api/tickets/                -> Listar mis boletas
-    # GET  /api/tickets/{id}/qr_image/  -> Generador O(1) de QR en RAM
+    # Incluye nativamente bajo O(log n):
+    # GET  /api/orders/orders/                 -> Listar historial del usuario (Anti-IDOR)
+    # GET  /api/orders/orders/{id}/check_status/ -> Polling asíncrono para el Frontend
+    # GET  /api/orders/tickets/                -> Consultar pases aprobados
+    # GET  /api/orders/tickets/{id}/qr_image/  -> Renderizador Vectorial RAM-Only del PDF
     path('', include(router.urls)),
 ]

@@ -1,5 +1,7 @@
 import logging
 import datetime
+import gc
+from io import BytesIO
 from celery import shared_task
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
@@ -7,11 +9,11 @@ from django.core.cache import cache
 from django.conf import settings
 from django.utils.html import strip_tags
 from django.utils import timezone
-from django.db import transaction, DatabaseError
+from django.db import transaction, DatabaseError, OperationalError
 
-# Importaciones de Modelos y Servicios
+# Importaciones de Modelos y el Servicio Asimétrico Avanzado
 from apps.orders.models import Order, Ticket
-from apps.orders.services import QRService
+from apps.orders.services import SmartTicketGodTierService
 
 logger = logging.getLogger(__name__)
 
@@ -21,87 +23,102 @@ logger = logging.getLogger(__name__)
 
 @shared_task(
     bind=True,
-    # 🛡️ INFINITE RETRY + EXPONENTIAL BACKOFF: Si SMTP falla, reintenta infinitamente 
-    # espaciando el tiempo (30s, 1m, 2m, 4m, 8m...) para evitar DDos interno.
     autoretry_for=(Exception,), 
     retry_backoff=30, 
     retry_backoff_max=3600,
     max_retries=None, 
     queue='financial_deliveries'
 )
-def process_order_tickets_and_email(self, order_id: str):
+def generate_and_dispatch_smart_tickets(self, order_id: str):
     """
-    WORKER TASK (Grado Fintech).
-    Desacoplamiento Absoluto: El fallo en la entrega jamás altera el estado financiero.
+    🚀 DESPACHADOR ASÍNCRONO DE ACTIVOS CRIPTOGRÁFICOS (GRADO BANCARIO).
+    Complejidad Temporal: O(N) O(1) I/O.
+    Consume tokens firmados digitalmente por curvas elípticas (ECDSA ES256)
+    y compila PDFs vectoriales ReportLab directamente en la RAM volátil,
+    emitiéndolos de forma segura vía túnel SMTP encapsulado.
     """
     logger.info(f"⚙️ [WORKER RUNNING] Inicializando despacho para Orden ID: {order_id}")
     
     sent_flag_key = f"flag_email_sent_{order_id}"
 
-    # 1. ESCUDO DE IDEMPOTENCIA (O(1) Redis Lock)
+    # 1. ESCUDO DE IDEMPOTENCIA PERIFÉRICA (O(1) Redis Lock)
     if cache.get(sent_flag_key):
-        logger.info(f"✅ [IDEMPOTENCIA] Tickets ya despachados para la orden {order_id}. Abortando duplicado.")
+        logger.info(f"✅ [IDEMPOTENCIA ACTIVADA] Tickets ya despachados para la orden {order_id}. Abortando duplicado redundante.")
         return "ALREADY_SENT"
 
     try:
-        # 2. BLOQUEO PESIMISTA: Protegemos la orden mientras preparamos los tickets
+        # 2. ZONA DE CONCURRENCIA PURA: Bloqueo Pesimista Atómico de Fila
         with transaction.atomic():
-            # 🚀 ANTI-N+1 SHIELD
-            order = Order.objects.select_for_update().prefetch_related(
-                'tickets__function__venue'
-            ).get(pk=order_id)
+            try:
+                # select_for_update prevent dirty reads de webhooks paralelos retrasados
+                order = Order.objects.select_for_update(nowait=True).prefetch_related(
+                    'tickets__function__venue'
+                ).get(pk=order_id)
+            except OperationalError:
+                logger.warning(f"🔒 [LOCK DELAY] La orden {order_id} está siendo retenida por otro hilo. Reintentando...")
+                raise self.retry(countdown=10)
             
             if order.status != Order.Status.APPROVED:
-                logger.warning(f"⚠️ [WORKER ABORT] Orden {order_id} no está aprobada (Actual: {order.status}).")
+                logger.warning(f"⚠️ [WORKER ABORT] La Orden {order_id} no cumple con el estado de pago aprobado (Status: {order.status}).")
                 return "ABORTED_INVALID_STATUS"
 
-            # 🛡️ MÁQUINA DE ESTADO DESACOPLADA (Dominio Logístico)
-            # Asegúrate de tener un campo `delivery_status` en tu modelo Order
-            if hasattr(order, 'delivery_status'):
-                if order.delivery_status == 'DELIVERED':
-                    return "ALREADY_DELIVERED_IN_DB"
-                order.delivery_status = 'PENDING_GENERATION'
-                order.save(update_fields=['delivery_status'])
+            # Checkpoint de control logístico interno en base de datos
+            if order.tickets_dispatched or order.delivery_status == 'DELIVERED':
+                logger.info(f"✅ [IDEMPOTENCIA DB] Registros financieros marcan la orden {order_id} como entregada.")
+                cache.set(sent_flag_key, "DELIVERED", timeout=2592000)
+                return "ALREADY_DELIVERED_IN_DB"
 
+            order.delivery_status = 'PENDING_GENERATION'
+            order.save(update_fields=['delivery_status'])
+
+        # 3. EXTRACCIÓN Y AUDITORÍA FORENSE DEL DESTINATARIO CORREO
         recipient_email = order.user.email if order.user else None
         if not recipient_email and order.payment_metadata:
-             recipient_email = order.payment_metadata.get('payer', {}).get('email')
+            recipient_email = order.payment_metadata.get('payer', {}).get('email')
              
         if not recipient_email:
-            # Si no hay correo, loggeamos como crítico, pero la orden SIGUE APROBADA.
-            logger.critical(f"💀 [DATA LEAK PREVENTED] No hay correo destino en la orden {order_id}")
+            logger.critical(f"💀 [CRITICAL DATA LOSS] Imposible despachar activos. No hay correo destino mapeado en la orden {order_id}")
+            with transaction.atomic():
+                order.delivery_status = 'FAILED'
+                order.save(update_fields=['delivery_status'])
             return "FAILED_NO_EMAIL"
 
-        attachments = []
+        attachments_pool = []
         tickets_data = []
+        event_name = "El Efecto Miller 2"
 
-        # 3. 🧠 GENERACIÓN DE ACTIVOS DIGITALES (O(1) MEMORY POOLING)
+        # 4. 🧠 CONSTRUCCIÓN VECTORIAL CRIPTOGRÁFICA (O(1) Memory Pooling)
         for ticket in order.tickets.all():
-            cache_key_qr = f"qr_cache_{ticket.id.hex}"
-            qr_bytes = cache.get(cache_key_qr)
+            if hasattr(ticket.function, 'name'):
+                event_name = ticket.function.name
 
-            if not qr_bytes:
-                logger.info(f"💡 Cache Miss (Ticket {ticket.id.hex}). Compilando matriz binaria.")
-                qr_bytes = QRService.generate_qr_image(ticket.qr_token)
-                cache.set(cache_key_qr, qr_bytes, timeout=86400) # Persistencia de 24h
+            # A. Derivación de la Firma Asimétrica Digital (Álgebra de Curvas Elípticas)
+            secure_jwt = SmartTicketGodTierService.generate_secure_jwt_token(
+                ticket_id=ticket.id.hex,
+                seat_label=ticket.seat_label,
+                event_name=event_name
+            )
 
-            function_name = ticket.function.name if hasattr(ticket.function, 'name') else "Evento Especial"
+            # B. Generación del PDF Vectorial RAM-Only (0% Escrituras en Disco)
+            pdf_data = SmartTicketGodTierService.generate_pdf_ticket_in_memory(ticket, secure_jwt)
             
             tickets_data.append({
                 'seat': ticket.seat_label,
                 'category': ticket.seat_category,
-                'show': function_name,
-                'date': ticket.function.date_time.strftime('%Y-%m-%d %H:%M'),
+                'show': event_name,
+                'date': ticket.function.date_time.strftime('%Y-%m-%d %H:%M') if ticket.function.date_time else 'Fecha N/A',
                 'venue': getattr(ticket.function.venue, 'name', 'Ubicación General')
             })
 
-            attachments.append((
-                f"Ticket_{ticket.seat_label}_{ticket.id.hex[:6]}.png",
-                qr_bytes,
-                "image/png"
-            ))
+            # Empaquetado binario del buffer volátil en el pool de archivos
+            filename = f"Entrada_{ticket.seat_label.replace(' ', '_')}_{ticket.id.hex[:6].upper()}.pdf"
+            attachments_pool.append((filename, pdf_data, "application/pdf"))
+            
+            # Mutación del estado del activo individual a Válido
+            ticket.state = Ticket.State.VALID
+            ticket.save(update_fields=['state'])
 
-        # 4. 📄 COMPILACIÓN DEL PAQUETE Y TÚNEL SMTP
+        # 5. MAQUETACIÓN DEL TEMPLATE HTML MOBILE-FIRST (Fase 4.1)
         context = {
             'order_reference': order.wompi_reference or str(order.id)[:8].upper(),
             'total_amount': order.total_amount,
@@ -110,52 +127,71 @@ def process_order_tickets_and_email(self, order_id: str):
             'platform_name': "Ceviche Platform"
         }
 
-        html_content = render_to_string('emails/tickets_delivery.html', context)
+        try:
+            html_content = render_to_string('emails/tickets_delivery.html', context)
+        except Exception as tpl_err:
+            logger.warning(f"⚠️ [TEMPLATE MISS] Plantilla HTML ausente o corrupta: {str(tpl_err)}. Desplegando Fallback de Seguridad.")
+            html_content = f"""
+            <h2>¡Tus entradas criptográficas para {event_name} están listas!</h2>
+            <p>Hemos verificado tu pago correctamente mediante Mercado Pago.</p>
+            <p>Adjunto a este mensaje encontrarás tus llaves de acceso en formato PDF vectorial.</p>
+            <p><b>Importante:</b> No compartas estos archivos con terceros. Cada código QR contiene una firma digital inmutable.</p>
+            """
+            
         text_content = strip_tags(html_content)
 
+        # 6. CAPA DE ENVÍO SEGURO SMTP (EmailMultiAlternatives)
         email = EmailMultiAlternatives(
-            subject=f"🎟️ Tus Entradas Están Listas - Ref: {context['order_reference']}",
+            subject=f"🎟️ Tus Entradas Criptográficas Están Listas - Ref: {context['order_reference']}",
             body=text_content,
             from_email=settings.DEFAULT_FROM_EMAIL,
             to=[recipient_email]
         )
         email.attach_alternative(html_content, "text/html")
 
-        # Inyección de Binarios Aislados
-        for filename, content, mimetype in attachments:
+        # Inyección atómica de los binarios vectoriales desde la RAM
+        for filename, content, mimetype in attachments_pool:
             email.attach(filename, content, mimetype)
 
-        # 🛡️ DESPACHO ATÓMICO SMTP (Bloqueante)
+        # Disparo seguro al servidor SMTP (Operación bloqueante delegada a Celery Worker)
         email.send(fail_silently=False)
         
-        # 5. ACTUALIZACIÓN DEL ESTADO LOGÍSTICO Y CIERRE
-        if hasattr(order, 'delivery_status'):
-            with transaction.atomic():
-                order_update = Order.objects.select_for_update().get(pk=order_id)
-                order_update.delivery_status = 'DELIVERED'
-                order_update.save(update_fields=['delivery_status'])
+        # 7. CIERRE DE COMPROMISO DEL LEDGER LOGÍSTICO Y PERSISTENCIA
+        with transaction.atomic():
+            order_final = Order.objects.select_for_update().get(pk=order_id)
+            order_final.tickets_dispatched = True
+            order_final.delivery_status = 'DELIVERED'
+            order_final.save(update_fields=['tickets_dispatched', 'delivery_status', 'updated_at'])
 
-        # Sello de Idempotencia Inmutable (Persistencia 30 días)
+        # Sellado del candado de idempotencia inmutable en Redis (30 días de persistencia)
         cache.set(sent_flag_key, "DELIVERED", timeout=2592000) 
         
-        logger.info(f"📨 [DESPACHO SUCCESS] Correo emitido a {recipient_email} (Ref: {context['order_reference']})")
+        logger.info(f"📨 [DESPACHO COMPLETO] {len(attachments_pool)} entradas criptográficas emitidas a {recipient_email}")
         return f"SUCCESS_DELIVERED_TO_{recipient_email}"
 
     except Order.DoesNotExist:
-        logger.error(f"❌ Orden {order_id} no encontrada (Fallo asincrónico DB).")
-        raise # Delega al retry
+        logger.error(f"❌ La Orden {order_id} no existe en el motor relacional de base de datos.")
+        return f"FAILED_ORDER_NOT_FOUND_{order_id}"
         
     except Exception as exc:
-        logger.critical(f"🚨 Falla en túnel SMTP o compilación: {exc}")
-        # El decorador @shared_task interceptará esta excepción y aplicará el Exponential Backoff
-        raise
+        logger.critical(f"🚨 [WORKER FAULT] Falla en túnel SMTP o compilación: {str(exc)}", exc_info=True)
+        try:
+            with transaction.atomic():
+                order_err = Order.objects.get(id=order_id)
+                order_err.delivery_status = 'FAILED'
+                order_err.save(update_fields=['delivery_status'])
+        except Exception:
+            pass
+        raise self.retry(exc=exc)
         
     finally:
-        # Prevención de Memory Dumping / CPU Exhaustion liberando binarios manualmente
-        if 'attachments' in locals():
-            del attachments
+        # 🧼 PROTOCOLO ANTI-MEMORY DUMPING (Red Teaming Standard)
+        # Erradicación manual forzada de hileras pesadas de bitmaps y estructuras HTML en memoria RAM
+        if 'attachments_pool' in locals():
+            del attachments_pool
         if 'tickets_data' in locals():
             del tickets_data
+        gc.collect()
 
 
 # ==============================================================================
@@ -165,8 +201,10 @@ def process_order_tickets_and_email(self, order_id: str):
 @shared_task(name="orders.purge_orphaned_reservations")
 def purge_orphaned_reservations():
     """
-    🛡️ SWEEPER DE NIVEL BANCARIO (Anti-Deadlock Mechanism)
-    Libera inventario sin colisionar con los Webhooks entrantes.
+    🛡️ SWEEPER DE NIVEL BANCARIO (Anti-Deadlock Mechanism).
+    Libera inventario zombi o reservas que abandonaron el carrito tras 15 minutos,
+    ignorando de forma proactiva aquellas bloqueadas por transacciones activas de Mercado Pago.
+    Complejidad Temporal: O(M) mediante indexación relacional en base de datos.
     """
     logger.info("📡 [SWEEPER INICIADO] Escaneando anomalías en la bóveda de inventario...")
     
@@ -174,37 +212,44 @@ def purge_orphaned_reservations():
 
     try:
         with transaction.atomic():
-            # 🛡️ GOD-TIER FIX: select_for_update(skip_locked=True)
-            # CRÍTICO: Si el webhook de MP está actualizando una orden en este exacto milisegundo, 
-            # el Sweeper la ignorará (skip_locked) en lugar de causar un bloqueo (Deadlock).
+            # 🛡️ ENGINE SKIP LOCKED (El cerrojo invulnerable del Cónclave)
+            # Si el webhook de Mercado Pago está impactando una orden en este exacto microsegundo,
+            # el Sweeper pasa de largo (skip_locked=True) mitigando Deadlocks y falsas anulaciones.
             expired_orders = Order.objects.select_for_update(skip_locked=True).filter(
                 status=Order.Status.PENDING, 
                 created_at__lt=expiration_time
             )
 
-            # Para evitar cargar todo en memoria, extraemos solo los IDs a purgar
             expired_order_ids = list(expired_orders.values_list('id', flat=True))
 
             if not expired_order_ids:
-                logger.info("✅ [SWEEPER] Clúster limpio. No se encontraron bloqueos huérfanos accesibles.")
+                logger.info("✅ [SWEEPER] Clúster balanceado. No se detectaron bloqueos huérfanos libres.")
                 return "CLEAN_CLUSTER"
 
-            # 💥 DESTRUCCIÓN ATÓMICA Y SILENCIOSA
+            # 💥 DESTRUCCIÓN ATÓMICA DE REGISTROS HIERÁRQUICOS O(1) EXECUTIONS
             tickets_released = Ticket.objects.filter(
                 order_id__in=expired_order_ids
-            ).update(state='VOIDED') 
+            ).update(state=Ticket.State.VOIDED) 
 
             orders_cancelled = Order.objects.filter(
                 id__in=expired_order_ids
             ).update(status=Order.Status.REJECTED)
 
         logger.info(
-            f"🔥 [SWEEPER EJECUTADO] Matriz purgada exitosamente. "
-            f"Sillas liberadas: {tickets_released} | Bóvedas destruidas: {orders_cancelled}"
+            f"🔥 [SWEEPER COMPLETED] Matriz purgada de forma atómica. "
+            f"Sillas liberadas: {tickets_released} | Órdenes zombis anuladas: {orders_cancelled}"
         )
-        
         return f"Purged {orders_cancelled} orders and freed {tickets_released} seats."
 
     except DatabaseError as e:
-        logger.error(f"⚠️ [SWEEPER ALERT] Falla transaccional limpiando bóvedas: {e}")
+        logger.error(f"⚠️ [SWEEPER ALERT] Exclusión mutua fallida en limpieza de bóvedas: {str(e)}")
         return "SWEEPER_ERROR_DB_LOCK"
+
+
+# ==============================================================================
+# ⚙️ COMPATIBILIDAD RETROACTIVA DE COMPILACIÓN (Anti-NameError Signal Tunnel)
+# ==============================================================================
+@shared_task(name="apps.orders.tasks.process_order_tickets_and_email")
+def process_order_tickets_and_email(order_id: str):
+    """Redirecciona de manera transparente llamadas heredadas de signals.py al despachador God-Tier."""
+    return generate_and_dispatch_smart_tickets.delay(order_id)
