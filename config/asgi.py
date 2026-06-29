@@ -1,23 +1,29 @@
 import os
-import django
 from django.core.asgi import get_asgi_application
 
-# 🔒 Inicialización temprana del core de Django requerida para hilos asíncronos
+# 1. Configuración del módulo de settings (Debe ejecutarse ANTES de cualquier importación de Django)
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
-django.setup()
 
+# 2. Inicialización nativa e inmutable de la aplicación HTTP ASGI
+django_asgi_app = get_asgi_application()
+
+# 🧠 DEFERRED IMPORTS: Las importaciones de Channels se ejecutan DESPUÉS de instanciar la app HTTP
+# para evitar condiciones de carrera en el registro de aplicaciones e hilos del sistema operativo.
 from channels.routing import ProtocolTypeRouter, URLRouter
 from channels.auth import AuthMiddlewareStack
-import apps.dashboard.routing  # 👈 Inyección del búnker de enrutamiento Regex de la Fase 6.2
+from channels.security.websocket import AllowedHostsOriginValidator # 🔥 ESCUDO ANTI-HIJACKING
+import apps.dashboard.routing
 
 application = ProtocolTypeRouter({
-    # Capa de red convencional síncrona
-    "http": get_asgi_application(),
+    # 🌐 Capa de red convencional síncrona (Aislada de forma segura)
+    "http": django_asgi_app,
     
-    # Capa de red persistente en tiempo real (Redis Channel Layer)
-    "websocket": AuthMiddlewareStack(
-        URLRouter(
-            apps.dashboard.routing.websocket_urlpatterns
+    # 🏎️ Capa de red persistente O(1) en tiempo real (Protección Bancaria Perimetral)
+    "websocket": AllowedHostsOriginValidator(
+        AuthMiddlewareStack(
+            URLRouter(
+                apps.dashboard.routing.websocket_urlpatterns
+            )
         )
     ),
 })
