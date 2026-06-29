@@ -135,7 +135,8 @@ class SmartTicketGodTierService:
             qr_buffer.write(qr_data_bytes)
             qr_buffer.seek(0)
             
-            reportlab_qr = Image(ImageReader(qr_buffer), width=160, height=160)
+            #reportlab_qr = Image(ImageReader(qr_buffer), width=160, height=160)
+            reportlab_qr = Image(qr_buffer, width=160, height=160)
             reportlab_qr.hAlign = 'CENTER'
             story.append(reportlab_qr)
             story.append(Spacer(1, 10))
